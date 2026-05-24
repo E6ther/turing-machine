@@ -1,5 +1,9 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { Code, Problem, ActiveVerifier, TestRecord } from "../core/types";
+import { getLawFn } from "../core/lawMap";
+
+type Mark = 0 | 1 | 2;
 
 interface GameState {
   problem: Problem | null;
@@ -14,6 +18,7 @@ interface GameState {
   currentRound: number;
   mode: number;
   hash: string;
+  markers: Record<string, Mark>;
 
   setProblem: (p: Problem) => void;
   setProposal: (code: Code) => void;
@@ -23,6 +28,9 @@ interface GameState {
   submitFinalAnswer: (code: Code) => boolean;
   backToCodeInput: () => void;
   nextRound: () => void;
+  setMarkers: (markers: Record<string, Mark>) => void;
+  cycleMarker: (col: number, d: number) => void;
+  clearState: () => void;
 }
 
 function buildDisplayOrder(ind: number[], mode: number, fake?: number[]): number[][] {
@@ -35,86 +43,172 @@ function buildDisplayOrder(ind: number[], mode: number, fake?: number[]): number
   return ind.map((id) => [id]);
 }
 
-export const useGameStore = create<GameState>((set, get) => ({
-  problem: null,
-  verifiers: [],
-  displayOrder: [],
-  records: [],
-  proposal: [1, 1, 1],
-  phase: "idle",
-  gamePhase: "code-input",
-  confirmedCode: null,
-  selectedVerifierIndex: null,
-  currentRound: 1,
-  mode: 0,
-  hash: "",
+function rebuildVerifiers(lawIds: number[]): ActiveVerifier[] {
+  return lawIds.map((lawId) => ({ lawId, fn: getLawFn(lawId) }));
+}
 
-  setProblem: (p) => set({
-    problem: p,
-    verifiers: p.verifiers,
-    displayOrder: buildDisplayOrder(p.ind, p.mode, p.fake),
-    records: [],
-    proposal: [1, 1, 1],
-    phase: "playing",
-    gamePhase: "code-input",
-    confirmedCode: null,
-    selectedVerifierIndex: null,
-    currentRound: 1,
-    mode: p.mode,
-    hash: p.hash,
-  }),
-
-  setProposal: (code) => set({ proposal: code }),
-
-  confirmCode: () =>
-    set((s) => ({
-      confirmedCode: [...s.proposal] as Code,
-      gamePhase: "verifier-select",
-      selectedVerifierIndex: null,
-    })),
-
-  selectVerifier: (index) =>
-    set((s) => ({
-      selectedVerifierIndex: s.selectedVerifierIndex === index ? null : index,
-    })),
-
-  testVerifier: () => {
-    const { confirmedCode, verifiers, selectedVerifierIndex, currentRound } = get();
-    if (!confirmedCode || selectedVerifierIndex === null) return null;
-    const result = verifiers[selectedVerifierIndex].fn(confirmedCode);
-    const record: TestRecord = {
-      round: currentRound,
-      proposal: confirmedCode,
-      cardIndex: selectedVerifierIndex,
-      result,
-    };
-    set((s) => ({ records: [...s.records, record] }));
-    return result;
+const persistStorage = {
+  getItem: (name: string) => {
+    const raw = localStorage.getItem(name);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const state = parsed?.state;
+    if (state) {
+      const lawIds: number[] = state.verifiers ?? [];
+      state.verifiers = rebuildVerifiers(lawIds);
+      if (state.problem) {
+        const plawIds: number[] = state.problem.verifiers ?? [];
+        state.problem.verifiers = rebuildVerifiers(plawIds);
+      }
+      state.displayOrder = buildDisplayOrder(
+        state.problem?.ind ?? [],
+        state.mode ?? 0,
+        state.problem?.fake,
+      );
+    }
+    return parsed;
   },
-
-  submitFinalAnswer: (code) => {
-    const { problem } = get();
-    if (!problem) return false;
-    const correct =
-      code[0] === problem.secretCode[0] &&
-      code[1] === problem.secretCode[1] &&
-      code[2] === problem.secretCode[2];
-    set({ phase: correct ? "solved" : "failed" });
-    return correct;
+  setItem: (name: string, value: unknown) => {
+    const state = (value as Record<string, unknown>)?.state as Record<string, unknown> | undefined;
+    if (state) {
+      if (Array.isArray(state.verifiers)) {
+        state.verifiers = (state.verifiers as ActiveVerifier[]).map((v) => v.lawId);
+      }
+      if (state.problem && typeof state.problem === "object") {
+        const p = state.problem as Record<string, unknown>;
+        if (Array.isArray(p.verifiers)) {
+          p.verifiers = (p.verifiers as ActiveVerifier[]).map((v) => v.lawId);
+        }
+      }
+      delete state.displayOrder;
+    }
+    localStorage.setItem(name, JSON.stringify(value));
   },
+  removeItem: (name: string) => localStorage.removeItem(name),
+};
 
-  backToCodeInput: () =>
-    set({
-      confirmedCode: null,
+export const useGameStore = create<GameState>()(
+  persist(
+    (set, get) => ({
+      problem: null,
+      verifiers: [],
+      displayOrder: [],
+      records: [],
+      proposal: [1, 1, 1],
+      phase: "idle",
       gamePhase: "code-input",
+      confirmedCode: null,
       selectedVerifierIndex: null,
+      currentRound: 1,
+      mode: 0,
+      hash: "",
+      markers: {},
+
+      setProblem: (p) => set({
+        problem: p,
+        verifiers: p.verifiers,
+        displayOrder: buildDisplayOrder(p.ind, p.mode, p.fake),
+        records: [],
+        proposal: [1, 1, 1],
+        phase: "playing",
+        gamePhase: "code-input",
+        confirmedCode: null,
+        selectedVerifierIndex: null,
+        currentRound: 1,
+        mode: p.mode,
+        hash: p.hash,
+        markers: {},
+      }),
+
+      setProposal: (code) => set({ proposal: code }),
+
+      confirmCode: () =>
+        set((s) => ({
+          confirmedCode: [...s.proposal] as Code,
+          gamePhase: "verifier-select",
+          selectedVerifierIndex: null,
+        })),
+
+      selectVerifier: (index) =>
+        set((s) => ({
+          selectedVerifierIndex: s.selectedVerifierIndex === index ? null : index,
+        })),
+
+      testVerifier: () => {
+        const { confirmedCode, verifiers, selectedVerifierIndex, currentRound } = get();
+        if (!confirmedCode || selectedVerifierIndex === null) return null;
+        const result = verifiers[selectedVerifierIndex].fn(confirmedCode);
+        const record: TestRecord = {
+          round: currentRound,
+          proposal: confirmedCode,
+          cardIndex: selectedVerifierIndex,
+          result,
+        };
+        set((s) => ({ records: [...s.records, record] }));
+        return result;
+      },
+
+      submitFinalAnswer: (code) => {
+        const { problem } = get();
+        if (!problem) return false;
+        const correct =
+          code[0] === problem.secretCode[0] &&
+          code[1] === problem.secretCode[1] &&
+          code[2] === problem.secretCode[2];
+        set({ phase: correct ? "solved" : "failed" });
+        return correct;
+      },
+
+      backToCodeInput: () =>
+        set({
+          confirmedCode: null,
+          gamePhase: "code-input",
+          selectedVerifierIndex: null,
+        }),
+
+      nextRound: () =>
+        set((s) => ({
+          confirmedCode: null,
+          gamePhase: "code-input",
+          selectedVerifierIndex: null,
+          currentRound: s.currentRound + 1,
+        })),
+
+      setMarkers: (markers) => set({ markers }),
+
+      cycleMarker: (col, d) => {
+        const key = `${col}-${d}`;
+        set((s) => {
+          const cur = s.markers[key] ?? 0;
+          const next = ((cur + 1) % 3) as Mark;
+          if (next === 0) {
+            const nextMap = { ...s.markers };
+            delete nextMap[key];
+            return { markers: nextMap };
+          }
+          return { markers: { ...s.markers, [key]: next } };
+        });
+      },
+
+      clearState: () => set({
+        problem: null,
+        verifiers: [],
+        displayOrder: [],
+        records: [],
+        proposal: [1, 1, 1],
+        phase: "idle",
+        gamePhase: "code-input",
+        confirmedCode: null,
+        selectedVerifierIndex: null,
+        currentRound: 1,
+        mode: 0,
+        hash: "",
+        markers: {},
+      }),
     }),
-
-  nextRound: () =>
-    set((s) => ({
-      confirmedCode: null,
-      gamePhase: "code-input",
-      selectedVerifierIndex: null,
-      currentRound: s.currentRound + 1,
-    })),
-}));
+    {
+      name: "turing-machine-game",
+      storage: persistStorage,
+    },
+  ),
+);

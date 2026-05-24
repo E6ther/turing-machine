@@ -1,26 +1,11 @@
-import { useState } from "react";
 import { ColorShape } from "./ColorShape";
+import { useGameStore } from "../store/gameStore";
 
 const DIGITS = [1, 2, 3, 4, 5];
 
-type Mark = 0 | 1 | 2;
-
 export function MarkersBox() {
-  const [marks, setMarks] = useState<Record<string, Mark>>({});
-
-  const cycle = (col: number, d: number) => {
-    const key = `${col}-${d}`;
-    setMarks((prev) => {
-      const cur = prev[key] ?? 0;
-      const next = ((cur + 1) % 3) as Mark;
-      if (next === 0) {
-        const nextMap = { ...prev };
-        delete nextMap[key];
-        return nextMap;
-      }
-      return { ...prev, [key]: next };
-    });
-  };
+  const markers = useGameStore((s) => s.markers);
+  const cycleMarker = useGameStore((s) => s.cycleMarker);
 
   return (
     <div className="bg-white rounded-xl shadow-md p-4">
@@ -31,11 +16,11 @@ export function MarkersBox() {
         <div className="flex justify-center"><ColorShape index={2} size={24} /></div>
         {DIGITS.flatMap((d) => [0, 1, 2].map((col) => {
           const key = `${col}-${d}`;
-          const mark = marks[key] ?? 0;
+          const mark = markers[key] ?? 0;
           return (
             <button
               key={key}
-              onClick={() => cycle(col, d)}
+              onClick={() => cycleMarker(col, d)}
               className="relative w-full h-10 flex items-center justify-center text-xl font-bold font-mono text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
             >
               {d}
