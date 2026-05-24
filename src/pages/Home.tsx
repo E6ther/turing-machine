@@ -1,9 +1,22 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLayout } from "../hooks/useLayout";
 
 export function Home() {
   const navigate = useNavigate();
   const layout = useLayout();
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("turing-machine-game");
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data?.state?.phase === "playing") {
+          navigate("/game", { replace: true });
+        }
+      }
+    } catch {}
+  }, [navigate]);
 
   return (
     <div
