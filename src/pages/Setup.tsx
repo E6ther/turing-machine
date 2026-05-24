@@ -79,9 +79,7 @@ export function Setup() {
       console.debug("[API 原始响应]", api);
       const problem = resolveProblem(api);
       console.debug("[解析后验证器]", problem.verifiers.map((v) => ({
-        cardId: v.cardId,
         lawId: v.lawId,
-        rule: v.desc,
       })));
       setProblem(problem);
       navigate("/game");
@@ -147,7 +145,7 @@ export function Setup() {
           className={
             "w-full py-4 rounded-xl text-lg font-bold text-white transition-all shadow-lg " +
             (loading
-              ? "bg-[#7ed99e] cursor-not-allowed"
+               ? "bg-[#7ed99e]"
               : "bg-[#2db563] hover:bg-[#259e56] active:bg-[#1e8849]")
           }
         >

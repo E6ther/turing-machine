@@ -1,13 +1,9 @@
 import { useState, useEffect } from "react";
 
-export type DeviceType = "mobile" | "tablet" | "desktop";
-export type Orientation = "portrait" | "landscape";
-export type LayoutMode = "stack" | "side-by-side";
-
 export interface LayoutInfo {
-  deviceType: DeviceType;
-  orientation: Orientation;
-  layoutMode: LayoutMode;
+  deviceType: "mobile" | "tablet" | "desktop";
+  orientation: "portrait" | "landscape";
+  layoutMode: "stack" | "side-by-side";
   width: number;
   height: number;
   isLandscape: boolean;
@@ -15,6 +11,10 @@ export interface LayoutInfo {
   isMobile: boolean;
   isDesktop: boolean;
 }
+
+type DeviceType = "mobile" | "tablet" | "desktop";
+type Orientation = "portrait" | "landscape";
+type LayoutMode = "stack" | "side-by-side";
 
 function getDeviceType(w: number): DeviceType {
   if (w < 768) return "mobile";

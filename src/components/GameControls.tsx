@@ -6,7 +6,6 @@ interface GameControlsProps {
   onTest: () => void;
   onNextRound: () => void;
   onSubmitAnswer: () => void;
-  onReset: () => void;
   onNewGame: () => void;
 }
 
@@ -18,7 +17,6 @@ export function GameControls({
   onTest,
   onNextRound,
   onSubmitAnswer,
-  onReset,
   onNewGame,
 }: GameControlsProps) {
   if (phase === "idle") {
@@ -66,12 +64,6 @@ export function GameControls({
         >
           提交答案
         </button>
-        <button
-          onClick={onReset}
-          className="px-4 py-3 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-        >
-          重新开始
-        </button>
       </div>
     );
   }
@@ -91,7 +83,7 @@ export function GameControls({
           `px-6 py-3 rounded-lg font-bold transition-colors ` +
           (canTest
             ? "bg-[#2db563] text-white hover:bg-[#259e56]"
-            : "bg-gray-200 text-gray-400 cursor-not-allowed")
+            : "bg-gray-200 text-gray-400")
         }
       >
         测试

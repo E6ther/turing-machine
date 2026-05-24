@@ -4,7 +4,7 @@ const SHAPES = [
   "circle",
 ] as const;
 
-const COLORS = ["#56b3dc", "#febc11", "#7f66ad"];
+export const SHAPE_COLORS = ["#56b3dc", "#febc11", "#7f66ad"];
 
 interface ColorShapeProps {
   index: number;
@@ -12,7 +12,7 @@ interface ColorShapeProps {
 }
 
 export function ColorShape({ index, size = 18 }: ColorShapeProps) {
-  const color = COLORS[index];
+  const color = SHAPE_COLORS[index];
   const shape = SHAPES[index];
   const s = size;
 
@@ -24,7 +24,7 @@ export function ColorShape({ index, size = 18 }: ColorShapeProps) {
           height: 0,
           borderLeft: `${s * 0.5}px solid transparent`,
           borderRight: `${s * 0.5}px solid transparent`,
-          borderBottom: `${s * 0.85}px solid ${color}`,
+          borderBottom: `${s}px solid ${color}`,
           display: "inline-block",
         }}
       />

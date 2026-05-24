@@ -4,6 +4,7 @@ import type { Code, Problem, ActiveVerifier, TestRecord } from "../core/types";
 interface GameState {
   problem: Problem | null;
   verifiers: ActiveVerifier[];
+  displayOrder: number[][];
   records: TestRecord[];
   proposal: Code;
   phase: "idle" | "playing" | "solved" | "failed";
@@ -12,10 +13,6 @@ interface GameState {
   selectedVerifierIndex: number | null;
   currentRound: number;
   mode: number;
-  /** Maps letter position → verifier index */
-  letterOrder: number[];
-  /** For extreme mode: how many cards per letter (2 for paired, 1 otherwise) */
-  cardsPerLetter: number;
 
   setProblem: (p: Problem) => void;
   setProposal: (code: Code) => void;
@@ -25,28 +22,22 @@ interface GameState {
   submitFinalAnswer: (code: Code) => boolean;
   backToCodeInput: () => void;
   nextRound: () => void;
-  reset: () => void;
 }
 
-function shuffledIndices(n: number): number[] {
-  const arr = Array.from({ length: n }, (_, i) => i);
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+function buildDisplayOrder(ind: number[], mode: number, fake?: number[]): number[][] {
+  if (mode === 1 && fake) {
+    return ind.map((id, i) => [id, fake[i]].sort((a, b) => a - b));
   }
-  return arr;
-}
-
-function buildLetterOrder(mode: number, verifierCount: number): { letterOrder: number[]; cardsPerLetter: number } {
   if (mode === 2) {
-    return { letterOrder: shuffledIndices(verifierCount), cardsPerLetter: 1 };
+    return [...ind].sort((a, b) => a - b).map((id) => [id]);
   }
-  return { letterOrder: Array.from({ length: verifierCount }, (_, i) => i), cardsPerLetter: 1 };
+  return ind.map((id) => [id]);
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
   problem: null,
   verifiers: [],
+  displayOrder: [],
   records: [],
   proposal: [1, 1, 1],
   phase: "idle",
@@ -55,26 +46,20 @@ export const useGameStore = create<GameState>((set, get) => ({
   selectedVerifierIndex: null,
   currentRound: 1,
   mode: 0,
-  letterOrder: [],
-  cardsPerLetter: 1,
 
-  setProblem: (p) => {
-    const { letterOrder, cardsPerLetter } = buildLetterOrder(p.mode, p.verifiers.length);
-    return set({
-      problem: p,
-      verifiers: p.verifiers,
-      records: [],
-      proposal: [1, 1, 1],
-      phase: "playing",
-      gamePhase: "code-input",
-      confirmedCode: null,
-      selectedVerifierIndex: null,
-      currentRound: 1,
-      mode: p.mode,
-      letterOrder,
-      cardsPerLetter,
-    });
-  },
+  setProblem: (p) => set({
+    problem: p,
+    verifiers: p.verifiers,
+    displayOrder: buildDisplayOrder(p.ind, p.mode, p.fake),
+    records: [],
+    proposal: [1, 1, 1],
+    phase: "playing",
+    gamePhase: "code-input",
+    confirmedCode: null,
+    selectedVerifierIndex: null,
+    currentRound: 1,
+    mode: p.mode,
+  }),
 
   setProposal: (code) => set({ proposal: code }),
 
@@ -85,29 +70,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       selectedVerifierIndex: null,
     })),
 
-  selectVerifier: (baseIndex) =>
-    set((s) => {
-      const { cardsPerLetter, selectedVerifierIndex } = s;
-      if (cardsPerLetter <= 1) {
-        return { selectedVerifierIndex: selectedVerifierIndex === baseIndex ? null : baseIndex };
-      }
-      // Extreme mode: cycle through cards under the same letter
-      const letterStart = baseIndex;
-      if (selectedVerifierIndex === null || Math.floor(selectedVerifierIndex / cardsPerLetter) !== Math.floor(letterStart / cardsPerLetter)) {
-        return { selectedVerifierIndex: letterStart };
-      }
-      const next = selectedVerifierIndex + 1;
-      if (next >= letterStart + cardsPerLetter) {
-        return { selectedVerifierIndex: null };
-      }
-      return { selectedVerifierIndex: next };
-    }),
+  selectVerifier: (index) =>
+    set((s) => ({
+      selectedVerifierIndex: s.selectedVerifierIndex === index ? null : index,
+    })),
 
   testVerifier: () => {
-    const { confirmedCode, verifiers, selectedVerifierIndex, currentRound, letterOrder } = get();
+    const { confirmedCode, verifiers, selectedVerifierIndex, currentRound } = get();
     if (!confirmedCode || selectedVerifierIndex === null) return null;
-    const actualIndex = letterOrder[selectedVerifierIndex];
-    const result = verifiers[actualIndex].fn(confirmedCode);
+    const result = verifiers[selectedVerifierIndex].fn(confirmedCode);
     const record: TestRecord = {
       round: currentRound,
       proposal: confirmedCode,
@@ -115,17 +86,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       result,
     };
     set((s) => ({ records: [...s.records, record] }));
-    console.debug("[测试]", {
-      round: currentRound,
-      proposal: confirmedCode,
-      letter: selectedVerifierIndex,
-      card: {
-        index: actualIndex,
-        cardId: verifiers[actualIndex].cardId,
-        rule: verifiers[actualIndex].desc,
-      },
-      result,
-    });
     return result;
   },
 
@@ -148,30 +108,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     }),
 
   nextRound: () =>
-    set((s) => {
-      const letterOrder = s.mode === 2 ? shuffledIndices(s.verifiers.length) : s.letterOrder;
-      return {
-        confirmedCode: null,
-        gamePhase: "code-input",
-        selectedVerifierIndex: null,
-        currentRound: s.currentRound + 1,
-        letterOrder,
-      };
-    }),
-
-  reset: () =>
-    set({
-      problem: null,
-      verifiers: [],
-      records: [],
-      proposal: [1, 1, 1],
-      phase: "idle",
-      gamePhase: "code-input",
+    set((s) => ({
       confirmedCode: null,
+      gamePhase: "code-input",
       selectedVerifierIndex: null,
-      currentRound: 1,
-      mode: 0,
-      letterOrder: [],
-      cardsPerLetter: 1,
-    }),
+      currentRound: s.currentRound + 1,
+    })),
 }));

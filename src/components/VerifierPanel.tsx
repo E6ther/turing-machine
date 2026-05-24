@@ -1,9 +1,7 @@
 import { useState } from "react";
-import type { ActiveVerifier } from "../core/types";
 
 interface VerifierPanelProps {
-  verifiers: ActiveVerifier[];
-  letterOrder: number[];
+  displayOrder: number[][];
 }
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -13,24 +11,30 @@ function cardImgSrc(cardId: number): string {
   return `/images/criteriacards/TM_GameCards_CNS-${n}.png`;
 }
 
-export function VerifierPanel({ verifiers, letterOrder }: VerifierPanelProps) {
-  const [preview, setPreview] = useState<number | null>(null);
+export function VerifierPanel({ displayOrder }: VerifierPanelProps) {
+  const [preview, setPreview] = useState<{ cardId: number; label: string } | null>(null);
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
-        {letterOrder.map((vi, i) => (
+      <div className={`grid gap-3 ${displayOrder[0]?.length > 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+        {displayOrder.map((group, i) => (
           <div
             key={i}
-            onClick={() => setPreview(i)}
-            className="rounded-xl overflow-hidden ring-1 ring-gray-200 shadow-sm cursor-pointer hover:ring-gray-400 transition-all"
+            className="rounded-xl overflow-hidden transition-all"
           >
-            <img
-              src={cardImgSrc(verifiers[vi].cardId)}
-              alt={`Card ${LETTERS[i]}`}
-              className="w-full h-auto block"
-              draggable={false}
-            />
+            <div className={`flex ${group.length > 1 ? "gap-3" : ""}`}>
+              {group.map((cardId, j) => (
+                <div key={j} className={`${group.length === 1 ? "w-full" : "min-w-0 flex-1"}`}>
+                  <img
+                    src={cardImgSrc(cardId)}
+                    alt={`Card ${LETTERS[i]}${group.length > 1 ? `-${j}` : ""}`}
+                    className="w-full h-auto block cursor-pointer hover:opacity-90 transition-opacity"
+                    draggable={false}
+                    onClick={() => setPreview({ cardId, label: LETTERS[i] })}
+                  />
+                </div>
+              ))}
+            </div>
             <div className="bg-[#2db563] text-white text-center text-sm font-bold py-0.5">
               {LETTERS[i]}
             </div>
@@ -45,12 +49,12 @@ export function VerifierPanel({ verifiers, letterOrder }: VerifierPanelProps) {
         >
           <div className="max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <img
-              src={cardImgSrc(verifiers[letterOrder[preview]].cardId)}
-              alt={`Card ${LETTERS[preview]}`}
+              src={cardImgSrc(preview.cardId)}
+              alt={`Card ${preview.label}`}
               className="w-full h-auto rounded-xl shadow-2xl"
             />
             <div className="text-center mt-3 text-white text-sm font-bold">
-              {LETTERS[preview]}
+              {preview.label}
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { DIGITS } from "../core/constants";
 import type { Code } from "../core/types";
-import { ColorShape } from "./ColorShape";
+import { ColorShape, SHAPE_COLORS } from "./ColorShape";
 
 interface CodeInputProps {
   value: Code;
@@ -22,9 +22,9 @@ export function CodeInput({
       <h2 className="text-lg font-bold">
         {submitMode ? "提交最终答案" : locked ? "本轮密码" : "选择密码"}
       </h2>
-      <div className="flex gap-4 justify-center">
+      <div className="flex flex-col gap-3">
         {value.map((digit, i) => (
-          <div key={i} className="flex flex-col items-center gap-1">
+          <div key={i} className="flex items-center gap-3">
             <ColorShape index={i} size={22} />
             <div className="flex gap-1">
               {DIGITS.map((d) => (
@@ -39,10 +39,11 @@ export function CodeInput({
                   className={
                     `w-10 h-10 rounded text-lg font-bold transition-colors ` +
                     (digit === d
-                      ? "bg-[#2db563] text-white"
+                      ? "text-white"
                       : "bg-gray-100 hover:bg-gray-200 text-gray-700") +
-                    (locked ? " opacity-50 cursor-not-allowed" : "")
+                    (locked ? " opacity-50" : "")
                   }
+                  style={digit === d ? { backgroundColor: SHAPE_COLORS[i] } : undefined}
                 >
                   {d}
                 </button>

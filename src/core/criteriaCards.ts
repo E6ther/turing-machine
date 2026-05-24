@@ -478,6 +478,3 @@ export function getCard(id: number): CriteriaCard | undefined {
   return cards.find((c) => c.id === id);
 }
 
-export function getAllCards(): CriteriaCard[] {
-  return cards;
-}

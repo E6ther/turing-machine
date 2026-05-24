@@ -1,19 +1,5 @@
 export type Code = [number, number, number];
 
-export const Color = {
-  Blue: 0,
-  Yellow: 1,
-  Purple: 2,
-} as const;
-
-export type Color = (typeof Color)[keyof typeof Color];
-
-export const COLOR_LABELS: Record<Color, string> = {
-  [Color.Blue]: "▲",
-  [Color.Yellow]: "■",
-  [Color.Purple]: "●",
-};
-
 export interface CriteriaCard {
   id: number;
   name: string;
@@ -21,27 +7,31 @@ export interface CriteriaCard {
 }
 
 export interface ActiveVerifier {
-  cardId: number;
   lawId: number;
-  desc: string;
   fn: (code: Code) => boolean;
 }
 
 export interface ApiResponse {
   status: string;
-  code: string;
-  n: number;
+  curDate: string;
+  idPartie: number;
+  color: number;
+  hash: string;
+  m: number | string;
+  d: number;
+  n: number | string;
+  code: number;
+  par: number;
   ind: number[];
   law: number[];
-  crypt?: number[];
-  hash?: string;
-  par?: number;
+  crypt: number[];
   fake?: number[];
 }
 
 export interface Problem {
   secretCode: Code;
   verifiers: ActiveVerifier[];
+  ind: number[];
   mode: number;
   fake?: number[];
 }

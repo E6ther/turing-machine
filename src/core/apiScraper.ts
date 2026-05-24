@@ -17,7 +17,7 @@ export async function fetchRandomProblem(settings?: GameSettings): Promise<ApiRe
       Origin: "https://turingmachine.info",
     },
   });
-  const data: ApiResponse & { code: number } = await res.json();
+  const data: ApiResponse = await res.json();
   if (data.status !== "ok") throw new Error("API returned bad status");
-  return { ...data, code: String(data.code) };
+  return data;
 }

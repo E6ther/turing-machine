@@ -17,6 +17,7 @@ export function Game() {
 
   const problem = useGameStore((s) => s.problem);
   const verifiers = useGameStore((s) => s.verifiers);
+  const displayOrder = useGameStore((s) => s.displayOrder);
   const records = useGameStore((s) => s.records);
   const proposal = useGameStore((s) => s.proposal);
   const phase = useGameStore((s) => s.phase);
@@ -24,9 +25,6 @@ export function Game() {
   const confirmedCode = useGameStore((s) => s.confirmedCode);
   const selectedVerifierIndex = useGameStore((s) => s.selectedVerifierIndex);
   const currentRound = useGameStore((s) => s.currentRound);
-  const mode = useGameStore((s) => s.mode);
-  const letterOrder = useGameStore((s) => s.letterOrder);
-  const cardsPerLetter = useGameStore((s) => s.cardsPerLetter);
   const setProposal = useGameStore((s) => s.setProposal);
   const confirmCode = useGameStore((s) => s.confirmCode);
   const selectVerifier = useGameStore((s) => s.selectVerifier);
@@ -34,7 +32,6 @@ export function Game() {
   const submitFinalAnswer = useGameStore((s) => s.submitFinalAnswer);
   const backToCodeInput = useGameStore((s) => s.backToCodeInput);
   const nextRound = useGameStore((s) => s.nextRound);
-  const reset = useGameStore((s) => s.reset);
 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submitCode, setSubmitCode] = useState<Code>([1, 1, 1]);
@@ -56,16 +53,20 @@ export function Game() {
   const latestRecord =
     records.length > 0 ? records[records.length - 1] : null;
 
-  const latestResultText =
-    latestRecord &&
-    latestRecord.round === currentRound &&
-    `${LETTERS[Math.floor(latestRecord.cardIndex / cardsPerLetter)]} → ${
-      latestRecord.result ? "✓" : "✗"
-    }`;
+  const latestResult =
+    latestRecord && latestRecord.round === currentRound
+      ? { text: `${LETTERS[latestRecord.cardIndex]} → ${latestRecord.result ? "✓" : "✗"}`, ok: latestRecord.result }
+      : null;
 
   const testedCards = new Set(
     records.filter((r) => r.round === currentRound).map((r) => r.cardIndex)
   );
+
+  const roundRecords = records.filter((r) => r.round === currentRound);
+  const testResults: (boolean | null)[] = verifiers.map((_, i) => {
+    const r = roundRecords.find((rec) => rec.cardIndex === i);
+    return r ? r.result : null;
+  });
 
   const padding = layout.isMobile ? "p-3" : "p-4";
 
@@ -80,7 +81,7 @@ export function Game() {
         </button>
 
         {phase !== "idle" && (
-          <VerifierPanel verifiers={verifiers} letterOrder={letterOrder} />
+          <VerifierPanel displayOrder={displayOrder} />
         )}
 
         {phase === "playing" && gamePhase === "code-input" && (
@@ -108,12 +109,12 @@ export function Game() {
             <div className="text-center text-sm text-gray-400">
               {roundVerifyCount >= 3
                 ? "本轮验证已达上限，请进行下一轮"
-                : `本轮验证: ${roundVerifyCount}/3`}
+                : `验证次数: ${roundVerifyCount}/3`}
             </div>
 
-            {latestResultText && (
-              <div className="text-center text-base font-bold text-gray-700">
-                {latestResultText}
+            {latestResult && (
+              <div className={`text-center text-base font-bold ${latestResult.ok ? "text-green-600" : "text-red-500"}`}>
+                {latestResult.text}
               </div>
             )}
 
@@ -133,28 +134,29 @@ export function Game() {
                 选择要测试的验证器
               </div>
               <div className="flex justify-center gap-2">
-                {Array.from({ length: verifiers.length / cardsPerLetter }, (_, li) => {
-                  const tested = cardsPerLetter > 1
-                    ? Array.from({ length: cardsPerLetter }, (_, j) => testedCards.has(li * cardsPerLetter + j)).every(Boolean)
-                    : testedCards.has(li);
-                  const selected = cardsPerLetter > 1
-                    ? Array.from({ length: cardsPerLetter }, (_, j) => selectedVerifierIndex === li * cardsPerLetter + j).some(Boolean)
-                    : selectedVerifierIndex === li;
+                {Array.from({ length: verifiers.length }, (_, i) => {
+                  const tested = testedCards.has(i);
+                  const selected = selectedVerifierIndex === i;
+                  const result = testResults[i];
+                  const borderClass = tested
+                    ? result ? "border-3 border-green-500" : "border-3 border-red-500"
+                    : selected ? "" : "border-3 border-gray-200";
                   return (
                     <button
-                      key={li}
+                      key={i}
                       disabled={tested || roundVerifyCount >= 3}
-                      onClick={() => selectVerifier(li * cardsPerLetter)}
+                      onClick={() => selectVerifier(i)}
                       className={
                         `w-12 h-12 rounded-lg text-lg font-bold transition-colors ` +
                         (tested
-                          ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                          ? "bg-gray-100 text-gray-300"
                           : selected
                             ? "bg-[#2db563] text-white shadow-sm"
-                            : "bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-300")
+                            : "bg-white text-gray-700 hover:border-gray-300") +
+                        " " + borderClass
                       }
                     >
-                      {LETTERS[li]}
+                      {LETTERS[i]}
                     </button>
                   );
                 })}
@@ -175,7 +177,6 @@ export function Game() {
               setSubmitCode([1, 1, 1]);
               setShowSubmitModal(true);
             }}
-            onReset={reset}
             onNewGame={() => navigate("/")}
           />
         )}
@@ -189,12 +190,11 @@ export function Game() {
             onTest={() => {}}
             onNextRound={nextRound}
             onSubmitAnswer={() => {}}
-            onReset={reset}
             onNewGame={() => navigate("/")}
           />
         )}
 
-        <TestHistory records={records} cardsPerLetter={cardsPerLetter} />
+        <TestHistory records={records} totalCards={verifiers.length} />
       </div>
 
       {showSubmitModal && (

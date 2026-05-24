@@ -5,8 +5,6 @@ export const DIGITS = [1, 2, 3, 4, 5] as const;
 //   code[1] = ■ = Yellow (方块)
 //   code[2] = ● = Purple (圆)
 
-export const API_BASE = "https://turingmachine.info/api/";
-
 export const ALL_CODES: [number, number, number][] = (() => {
   const codes: [number, number, number][] = [];
   for (let a = 1; a <= 5; a++)

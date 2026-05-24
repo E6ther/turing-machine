@@ -27,29 +27,24 @@ turing-machine/
 │   │   ├── apiScraper.ts       # 从 turingmachine.info 抓题
 │   │   └── constants.ts        # 常量
 │   ├── store/
-│   │   ├── gameStore.ts        # 游戏状态 (Zustand)
-│   │   └── noteSheetStore.ts   # 推理笔记状态
+│   │   └── gameStore.ts        # 游戏状态 (Zustand)
 │   ├── components/
 │   │   ├── CodeInput.tsx       # 3 位数输入 + 确认密码按钮
-│   │   ├── VerifierPanel.tsx   # 验证器卡片图片展示 + 单选交互
-│   │   ├── NoteSheet.tsx       # 推理笔记
+│   │   ├── VerifierPanel.tsx   # 验证器卡片图片展示
 │   │   ├── GameControls.tsx    # 阶段驱动按钮组
 │   │   ├── TestHistory.tsx     # 历史记录（按轮次分组）
-│   │   └── GameLayout.tsx      # 响应式布局容器
+│   │   └── ColorShape.tsx      # ▲■● 形状 SVG
 │   ├── pages/
 │   │   ├── Home.tsx            # 首页
 │   │   ├── Setup.tsx           # 游戏设置页（m/d/n 参数）
-│   │   └── Game.tsx            # 游戏主页面（纵向布局）
+│   │   └── Game.tsx            # 游戏主页面（居中布局 + 左右侧栏）
 │   ├── hooks/
 │   │   └── useLayout.ts        # 设备类型/方向检测
-│   ├── i18n/
-│   │   └── zh.ts               # 中文文案
 │   ├── App.tsx
 │   └── main.tsx
 ├── public/
 │   └── images/
-│       ├── criteriacards/      # 48 张标准卡图片 (PNG)
-│       └── laws/               # law 图片 (JPG)
+│       └── criteriacards/      # 48 张标准卡图片 (PNG)
 └── package.json
 ```
 
@@ -61,53 +56,52 @@ turing-machine/
 // 3 位密码，每位 1-5
 type Code = [number, number, number];
 
-// 三色枚举: ▲=Blue, ■=Yellow, ●=Purple
-enum Color { Blue = 0, Yellow = 1, Purple = 2 }
-
-// 候选验证函数 (对应一张 law 图片)
-// lawMap[lawId] = (code) => boolean
-const lawMap: Record<number, (code: Code) => boolean>;
-
-// 标准卡定义
+// 标准卡定义（仅用于 criteriaCards.ts 内部）
 interface CriteriaCard {
-  id: number;                           // 1-48
-  name: string;                         // 中文名
+  id: number;
+  name: string;
   candidates: { lawId: number; desc: string }[];
 }
 
-// 激活后的验证器
+// 激活后的验证器（只含验证逻辑，不含展示）
 interface ActiveVerifier {
-  cardId: number;
   lawId: number;
-  desc: string;
   fn: (code: Code) => boolean;
 }
 
 // API 返回的原始数据
 interface ApiResponse {
   status: string;
-  code: string;      // 如 "443"
-  n: number;         // 验证器数量
-  ind: number[];     // 标准卡 ID 列表
-  law: number[];     // law ID 列表（直接对应激活的候选函数）
-  crypt: number[];   // 密文（忽略）
+  curDate: string;
+  idPartie: number;
+  color: number;           // crypt 类型标记（本游戏忽略）
   hash: string;
-  par: number;
-  fake?: number[];   // 极限模式（m=1）下的假验证器索引
+  m: number | string;      // 游戏模式: 0=经典, 1=极限, 2=噩梦
+  d: number;               // 难度
+  n: number | string;      // 验证器数量
+  code: number;            // 秘密密码（3位数）
+  par: number;             // 标准杆验证次数
+  ind: number[];           // 标准卡 ID 列表
+  law: number[];           // law ID 列表
+  crypt: number[];         // 密文（本游戏忽略）
+  fake?: number[];         // [极限模式] 假验证器卡片 ID 列表
 }
 
 // 解析后的问题
 interface Problem {
   secretCode: Code;
   verifiers: ActiveVerifier[];
+  ind: number[];
+  mode: number;
+  fake?: number[];
 }
 
-// 单次验证记录（每轮多次验证，每次只测 1 张卡片）
+// 单次验证记录
 interface TestRecord {
-  round: number;        // 第几轮
-  proposal: Code;       // 本轮确认的密码
-  cardIndex: number;    // 被测卡片在 verifiers[] 中的下标
-  result: boolean;      // ✓/✗
+  round: number;
+  proposal: Code;
+  cardIndex: number;
+  result: boolean;
 }
 ```
 
@@ -131,18 +125,20 @@ interface TestRecord {
 官网 API (?uuid=&m=&d=&n=)
    │
    ▼
-{ code:254, ind:[2,6,13,17], law:[25,38,95,87] }
+{ code:254, ind:[2,6,13,17], law:[25,38,95,87], m:0, fake? }
    │
-   ├── ind[i] → criteriaCards[id]  → 获取标准卡元信息
-   ├── law[i] → lawMap[id]         → 获取验证函数
+   ├── api.law → verifiers[]  ← 只含 { lawId, fn }，只管验证
+   ├── api.ind → displayOrder ← 只含卡片 ID，只管展示
    │
    ▼
-组装 ActiveVerifier[]
-[
-  { cardId:2,  lawId:25, fn: (code) => code[0] < 3 },   // 卡片 B
-  { cardId:6,  lawId:38, fn: (code) => code[2] % 2 === 1 }, // 卡片 C
-  ...
-]
+展示层 (VerifierPanel) ─── displayOrder ─── 卡片图片
+验证层 (testVerifier)  ─── verifiers[i].fn ── 密码测试
+
+displayOrder 各模式构造:
+  经典(0): [[ind[0]], [ind[1]], …]
+  极限(1): [[ind[0], fake[0]], [ind[1], fake[1]], …]  组内排序
+  噩梦(2): [[sorted ind[0]], [sorted ind[1]], …]       整体排序
+
    │
    ▼
 ┌── 游戏流程 ──────────────────────────────────────┐
@@ -153,13 +149,14 @@ interface TestRecord {
 │  └────────┬─────────┘                            │
 │           ▼                                      │
 │  ┌──────────────────┐                            │
-│  │ 验证阶段          │  ← 单选卡片 A/B/C/D       │
-│  │ [测试]           │  → fn(confirmedCode)       │
+│  │ 验证阶段          │  ← 单选字母 A/B/C/D       │
+│  │ [测试]           │  → verifiers[i].fn(code)   │
 │  │ [下一轮]         │  → 回到编码阶段            │
 │  │ [提交答案]       │  → 弹窗选数字提交最终答案   │
 │  └──────────────────┘                            │
 │                                                  │
 │  每轮最多验证 3 次，每次测 1 张卡片               │
+│  字母 i 对应 displayOrder[i] 展示、verifiers[i] 验证 │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -195,26 +192,35 @@ interface TestRecord {
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `problem` | `Problem \| null` | 当前题目 |
-| `verifiers` | `ActiveVerifier[]` | 所有验证器 |
+| `verifiers` | `ActiveVerifier[]` | 所有验证器（只含验证逻辑） |
+| `displayOrder` | `number[][]` | 展示用卡片 ID 分组，每组对应一个字母位置 |
 | `records` | `TestRecord[]` | 验证历史 |
 | `proposal` | `Code` | 编码阶段当前选中的数字 |
 | `phase` | `"idle" \| "playing" \| "solved" \| "failed"` | 整体游戏状态 |
 | `gamePhase` | `"code-input" \| "verifier-select"` | 当前游戏阶段 |
 | `confirmedCode` | `Code \| null` | 本轮已确认的密码 |
-| `selectedVerifierIndex` | `number \| null` | 验证阶段选中的卡片下标 |
+| `selectedVerifierIndex` | `number \| null` | 验证阶段选中的位置下标 |
 
 ### 核心动作
 
 | 动作 | 触发 | 逻辑 |
 |------|------|------|
-| `setProblem(p)` | 设置页开始游戏 | 初始化 verifiers, phase="playing", gamePhase="code-input" |
+| `setProblem(p)` | 设置页开始游戏 | 根据 mode 构建 displayOrder；初始化全部状态 |
 | `setProposal(code)` | 数字按钮 | 更新当前编辑的密码 |
 | `confirmCode()` | [确认密码] | 锁定 proposal → confirmedCode，切到 verifier-select |
-| `selectVerifier(i)` | 点击卡片 | 单选切换（再次点击取消），验证阶段可用 |
-| `testVerifier()` | [测试] | 用 confirmedCode 测选中的卡片 fn，写入 TestRecord |
-| `nextRound()` | [下一轮] | confirmedCode=null, gamePhase="code-input", selectedVerifier=null |
+| `selectVerifier(i)` | 点击字母按钮 | 纯 toggle（再次点击取消） |
+| `testVerifier()` | [测试] | verifiers[selectedVerifierIndex].fn(confirmedCode)，写入 TestRecord |
+| `nextRound()` | [下一轮] | 仅复位阶段，不做排序/洗牌 |
 | `submitFinalAnswer(code)` | [提交] 弹窗 | 比对 code 与 secretCode → solved / failed |
 | `reset()` | [重新开始] | 全部清空 |
+
+### displayOrder 构造规则
+
+| 模式 | 规则 |
+|------|------|
+| 经典(0) | `ind.map(id => [id])` → `[[9], [3], [18], [16], [15]]` |
+| 极限(1) | `ind.map((id, i) => [id, fake[i]].sort())` → `[[9,25], [3,21], [2,18], [8,16], [1,15]]` |
+| 噩梦(2) | `[...ind].sort().map(id => [id])` → `[[3], [6], [13], [18], [29]]` |
 
 ---
 
@@ -224,21 +230,19 @@ interface TestRecord {
 // 从 API 解析问题
 function resolveProblem(api: ApiResponse): Problem {
   return {
-    secretCode: parseCode(api.code),
-    verifiers: api.ind.map((cardId, i) => {
-      const lawId = api.law[i];
-      return {
-        cardId,
-        lawId,
-        fn: lawMap[lawId],
-        desc: criteriaCards.find(c => c.id === cardId)
-                ?.candidates.find(c => c.lawId === lawId)?.desc ?? "",
-      };
-    }),
+    secretCode: parseCode(String(api.code)),
+    verifiers: api.law.map((lawId) => ({
+      lawId,
+      fn: getLawFn(lawId),
+    })),
+    ind: api.ind,
+    mode: Number(api.m),
+    fake: api.fake,
   };
 }
 
 // 单卡片验证（由 gameStore.testVerifier() 调用）
+// selectedVerifierIndex 直接作为 verifiers 下标
 function testSingleVerifier(
   proposal: Code,
   verifier: ActiveVerifier
@@ -253,11 +257,11 @@ function testSingleVerifier(
 
 | 组件 | 职责 |
 |------|------|
-| `VerifierPanel` | 展示题目卡片图片，左上角字母 A/B/C/...，验证阶段可选，已测卡片显示结果 |
-| `CodeInput` | ▲ ■ ● 数字选择器（1-5 按钮组），编码阶段显示确认按钮，确认后锁定 |
+| `VerifierPanel` | 按 displayOrder 展示卡片图片，每组对应一个字母标签。极限模式每组额外显示假卡图。点击可放大预览（仅真实卡）。 |
+| `CodeInput` | ▲ ■ ● 数字选择器（1-5 按钮组），编码阶段显示确认按钮，确认后锁定。支持提交模式弹窗。 |
 | `GameControls` | 根据 phase + gamePhase 渲染按钮组（确认密码/测试/下一轮/提交答案/重新开始） |
 | `TestHistory` | 按轮次分组展示所有历史验证记录 |
-| `NoteSheet` | 折叠式推理笔记文本框 |
+| `ColorShape` | 渲染 ▲(蓝) ■(黄) ●(紫) 三种形状，用于 CodeInput 和 Game 页面 |
 
 ---
 
@@ -328,16 +332,23 @@ Headers: Referer: https://turingmachine.info/
 Response:
 {
   status: "ok",
-  code: 254,           // 秘密答案（数字，需转为字符串 "254"）
-  n: 5,                // 验证器数量
-  ind: [2,6,13,17,21], // 标准卡 ID
-  law: [25,38,95,87,81], // law ID（激活的候选函数）
-  crypt: [224,490,386,395,523],
-  hash: "B51 V63 5 ",
-  par: 7,
-  fake?: [1,11,13,25,20]  // 极限模式（m=1）下存在
+  curDate: "1779658749",     // 时间戳
+  idPartie: 916773,          // 游戏局 ID
+  color: 1,                  // crypt 类型标记（忽略）
+  hash: "E5S H45 ",          // 哈希谜题标识
+  m: "1",                    // 游戏模式: 0=经典, 1=极限, 2=噩梦
+  d: 1,                      // 难度: 1/2/3
+  n: "5",                    // 验证器数量
+  code: 135,                 // 秘密密码（3位数，number 类型）
+  par: 6,                    // 标准杆验证次数
+  ind: [9,3,18,16,15],       // 标准卡 ID 列表
+  law: [47,8,56,132,115],    // law ID 列表
+  crypt: [219,564,424,515,406], // 密文（忽略）
+  fake?: [25,21,2,8,1]       // [极限模式] 假验证器的卡片 ID 列表
 }
 ```
+
+注意：`m` 和 `n` 字段类型可能为字符串或数字，解析时统一用 `Number()` 转换。
 
 ---
 
@@ -372,8 +383,90 @@ Response:
 2. 每张 law 图片对应一个确定的验证函数：`(code: Code) => boolean`
 3. 每张标准卡（criteria card）由多个候选组成，每个候选关联一个 lawId
 4. API 返回的 `ind` 和 `law` 数组等长，一一对应
-5. lawMap 和 criteriaCards 由用户描述 + 开发者实现，两阶段构建
+5. **展示与验证解耦**：`verifiers[]` 只含 `{lawId, fn}`（验证），`displayOrder` 只含卡片 ID（展示），两者通过位置 i 对齐
 6. 颜色与 code 索引映射：`code[0] = ▲(蓝)`, `code[1] = ■(黄)`, `code[2] = ●(紫)`
 7. 每轮最多验证 3 次，每次只测 1 张卡片
-8. 卡片用字母标识：A/B/C/D...，对应下标 0/1/2/3...
+8. 卡片用字母标识：A/B/C/D...，对应 displayOrder 的下标
 9. 最终答案通过独立弹窗提交，编码区的数字仅用于本轮验证
+
+## 模式对照
+
+| 模式 | 展示规则 | 验证规则 | 每轮变化 |
+|------|---------|---------|---------|
+| 经典(0) | `[[ind[0]], [ind[1]], …]` 原序 | `verifiers[i].fn(code)` | 无 |
+| 极限(1) | `[[ind[0], fake[0]], …]` 原序，组内排序 | `verifiers[i].fn(code)` | 无 |
+| 噩梦(2) | `[[sorted ind[0]], …]` 整体排序 | `verifiers[i].fn(code)` | 无 |
+
+- 极限模式下 `fake` 是展示层的视觉干扰，验证始终对应真实的 `law`
+- 三种模式下 `selectedVerifierIndex` 都直接作为 `verifiers[]` 下标
+
+---
+
+## 页面布局架构
+
+### 宽屏（横屏）— 居中 + 绝对定位侧栏
+
+```
+                   游戏区域始终居中
+  ←─────────────────────────────────────────→
+          ┌──────┐ ┌───────────────┐ ┌──────┐
+          │ 历史  │ │    游戏区域    │ │ 预留  │
+          │sticky │ │  max-w-lg     │ │sticky│
+          │shrink │ │  w-full       │ │shrink│
+          │  -0   │ │               │ │  -0  │
+          └──────┘ └───────────────┘ └──────┘
+          right-full        │          left-full
+          + mr-4            │          + ml-4
+                          居中
+```
+
+| 层级 | CSS 实现 | 说明 |
+|------|----------|------|
+| 外层容器 | `flex justify-center min-h-dvh` | 水平居中 |
+| 游戏区域 | `max-w-lg w-full relative` | 作为左右侧栏的定位锚点 |
+| 左侧历史 | `absolute right-full mr-4 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto shrink-0` | 附着在游戏区域左侧，自身可滚动 |
+| 右侧预留 | `absolute left-full ml-4` | 空容器，未来添加内容时启用 |
+
+- 历史侧栏默认不渲染，有记录时 (`records.length > 0`) 才显示
+- 右栏仅在需要时启用（预留扩展能力）
+- 游戏区域自身无 margin/padding 干扰居中
+
+### 竖屏（移动端）— 左侧悬浮按钮 + 弹窗
+
+```
+┌──────────────────────┐
+│                      │
+│                      │
+│      游戏内容         │
+│                      │
+│                      │
+│ ┌────┐               │  ← 左侧居中竖长方形按钮
+│ │    │               │     fixed left-0 top-1/2
+│ │历  │               │     -translate-y-1/2
+│ │史  │               │     w-6 h-24 bg-white
+│ │    │               │     rounded-r-xl shadow
+│ └────┘               │     writing-mode: vertical-rl
+└──────────────────────┘
+   ↓ 点击
+┌──────────────────────┐
+│  ┌────────────────┐  │  ← 全屏半透明遮罩
+│  │ ✕ 历史记录     │  │  ← 居中白色卡片 rounded-xl
+│  │                │  │     max-h-[80vh] overflow-y-auto
+│  │  表格内容      │  │     点击右上角 ✕ 关闭
+│  │                │  │
+│  └────────────────┘  │
+└──────────────────────┘
+```
+
+| 状态 | 元素 | 行为 |
+|------|------|------|
+| 默认 | 竖长方形按钮「历史」| `fixed left-0 top-1/2 -translate-y-1/2`，文字竖排 |
+| 点击按钮 | 遮罩 + 白色卡片 | 卡片内展示 `TestHistory`，右上角 `✕` 按钮 |
+| 点击 ✕ | 关闭弹窗 | 回到默认状态，按钮重新出现 |
+
+### 响应式策略
+
+| 设备 | 历史记录展示方式 |
+|------|-----------------|
+| 宽屏 (`!layout.isMobile`) | 游戏区域左侧 sticky 侧栏 |
+| 竖屏 (`layout.isMobile`) | 左侧悬浮按钮 → 点击弹出全屏浮层 |
