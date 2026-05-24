@@ -84,7 +84,7 @@ export function Game() {
 
       {hash && (
         <div className="flex items-center justify-center gap-3">
-          <span className="text-4xl font-black font-mono text-slate-800 tracking-wider">#{hash}</span>
+          <span className="text-4xl font-black text-slate-800 tracking-tight">#{hash}</span>
           <button
             onClick={() => {
               navigator.clipboard.writeText(`#${hash.replace(/\s+/g, "")}`);
