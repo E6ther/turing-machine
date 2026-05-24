@@ -8,7 +8,7 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 function cardImgSrc(cardId: number): string {
   const n = String(cardId).padStart(2, "0");
-  return `/images/criteriacards/TM_GameCards_CNS-${n}.png`;
+  return `${import.meta.env.BASE_URL}images/criteriacards/TM_GameCards_CNS-${n}.png`;
 }
 
 export function VerifierPanel({ displayOrder }: VerifierPanelProps) {
