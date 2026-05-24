@@ -31,11 +31,13 @@ function generateUUID(): string {
 }
 
 const TARGET = "https://turingmachine.info/api/api.php";
-const PROXY_CHAIN = [
+
+const PROXY_LIST = [
   (u: string) => u,
   (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
   (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  (u: string) => `https://corsproxy.org/?${encodeURIComponent(u)}`,
+  (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
 ];
 
 const headers = {
@@ -43,34 +45,40 @@ const headers = {
   Origin: "https://turingmachine.info",
 };
 
+async function tryFetch(url: string, timeoutMs: number): Promise<ApiResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal, headers });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+    const data: ApiResponse = JSON.parse(text);
+    if (data.status !== "ok") throw new Error("API returned bad status");
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchApi(params: string): Promise<ApiResponse> {
   const targetUrl = `${TARGET}?${params}`;
 
   if (!import.meta.env.PROD) {
-    const res = await fetch(`/api/api.php?${params}`, { headers });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
-    return JSON.parse(text);
+    return tryFetch(`/api/api.php?${params}`, 10000);
   }
 
-  for (const buildUrl of PROXY_CHAIN) {
-    try {
-      const url = buildUrl(targetUrl);
-      console.log("[API] trying:", url.slice(0, 120));
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timer);
-      const text = await res.text();
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
-      const data: ApiResponse = JSON.parse(text);
-      if (data.status !== "ok") throw new Error("API returned bad status");
+  const urls = PROXY_LIST.map((fn) => fn(targetUrl));
+  const attempts: Promise<ApiResponse>[] = urls.map((url) =>
+    tryFetch(url, 15000).then((data) => {
+      console.log("[API] OK:", url.slice(0, 120));
       return data;
-    } catch (err) {
-      console.warn("[API] failed:", err);
-    }
+    })
+  );
+  try {
+    return await Promise.any(attempts);
+  } catch {
+    throw new Error("所有请求方式均失败，可能是网络或CORS限制");
   }
-  throw new Error("所有请求方式均失败，可能是网络或CORS限制");
 }
 
 export async function fetchRandomProblem(settings?: GameSettings): Promise<ApiResponse> {
