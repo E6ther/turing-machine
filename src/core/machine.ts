@@ -8,6 +8,7 @@ export function resolveProblem(api: ApiResponse): Problem {
     ind: api.ind,
     mode: Number(api.m),
     fake: api.fake,
+    hash: api.hash,
   };
 }
 

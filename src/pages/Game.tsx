@@ -8,6 +8,7 @@ import { ColorShape } from "../components/ColorShape";
 import { VerifierPanel } from "../components/VerifierPanel";
 import { GameControls } from "../components/GameControls";
 import { TestHistory } from "../components/TestHistory";
+import { MarkersBox } from "../components/MarkersBox";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -32,9 +33,12 @@ export function Game() {
   const submitFinalAnswer = useGameStore((s) => s.submitFinalAnswer);
   const backToCodeInput = useGameStore((s) => s.backToCodeInput);
   const nextRound = useGameStore((s) => s.nextRound);
+  const hash = useGameStore((s) => s.hash);
 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [showHistoryOverlay, setShowHistoryOverlay] = useState(false);
+  const [showMarkersOverlay, setShowMarkersOverlay] = useState(false);
   const [submitCode, setSubmitCode] = useState<Code>([1, 1, 1]);
 
   useEffect(() => {
@@ -50,14 +54,6 @@ export function Game() {
     gamePhase === "verifier-select" &&
     selectedVerifierIndex !== null &&
     roundVerifyCount < 3;
-
-  const latestRecord =
-    records.length > 0 ? records[records.length - 1] : null;
-
-  const latestResult =
-    latestRecord && latestRecord.round === currentRound
-      ? { text: `${LETTERS[latestRecord.cardIndex]} → ${latestRecord.result ? "✓" : "✗"}`, ok: latestRecord.result }
-      : null;
 
   const testedCards = new Set(
     records.filter((r) => r.round === currentRound).map((r) => r.cardIndex)
@@ -80,92 +76,106 @@ export function Game() {
         &larr; 返回首页
       </button>
 
-      {phase !== "idle" && (
-        <VerifierPanel displayOrder={displayOrder} />
-      )}
-
-      {phase === "playing" && gamePhase === "code-input" && (
-        <CodeInput
-          value={proposal}
-          onChange={setProposal}
-          locked={false}
-        />
-      )}
-
-      {phase === "playing" && gamePhase === "verifier-select" && confirmedCode && (
-        <div className="border rounded-xl bg-white p-4 space-y-3">
-          <div className="text-center">
-            <span className="text-sm font-bold text-gray-500">本轮密码</span>
-            <div className="flex justify-center gap-4 mt-1">
-              {confirmedCode.map((d, i) => (
-                <span key={i} className="flex flex-col items-center gap-1">
-                  <ColorShape index={i} size={22} />
-                  <span className="text-2xl font-bold text-gray-800">{d}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="text-center text-sm text-gray-400">
-            {roundVerifyCount >= 3
-              ? "本轮验证已达上限，请进行下一轮"
-              : `验证次数: ${roundVerifyCount}/3`}
-          </div>
-
-          {latestResult && (
-            <div className={`text-center text-base font-bold ${latestResult.ok ? "text-green-600" : "text-red-500"}`}>
-              {latestResult.text}
-            </div>
-          )}
-
-          {roundVerifyCount === 0 && (
-            <div className="text-center">
-              <button
-                onClick={backToCodeInput}
-                className="text-sm text-[#2db563] hover:text-[#1e8849] transition-colors"
-              >
-                &larr; 返回重新选择密码
-              </button>
-            </div>
-          )}
-
-          <div>
-            <div className="text-center text-sm text-gray-500 mb-2">
-              选择要测试的验证器
-            </div>
-            <div className="flex justify-center gap-2">
-              {Array.from({ length: verifiers.length }, (_, i) => {
-                const tested = testedCards.has(i);
-                const selected = selectedVerifierIndex === i;
-                const result = testResults[i];
-                const borderClass = tested
-                  ? result ? "border-3 border-green-500" : "border-3 border-red-500"
-                  : selected ? "" : "border-3 border-gray-200";
-                return (
-                  <button
-                    key={i}
-                    disabled={tested || roundVerifyCount >= 3}
-                    onClick={() => selectVerifier(i)}
-                    className={
-                      `w-12 h-12 rounded-lg text-lg font-bold transition-colors ` +
-                      (tested
-                        ? "bg-gray-100 text-gray-300"
-                        : selected
-                          ? "bg-[#2db563] text-white shadow-sm"
-                          : "bg-white text-gray-700 hover:border-gray-300") +
-                      " " + borderClass
-                    }
-                  >
-                    {LETTERS[i]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+      {hash && (
+        <div className="flex items-center justify-center gap-3">
+          <span className="text-4xl font-black font-mono text-slate-800 tracking-wider">#{hash}</span>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(`#${hash.replace(/\s+/g, "")}`);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+            className="text-sm font-bold text-white bg-gray-800 hover:bg-gray-700 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+            title="复制 hash"
+          >
+            <svg viewBox="0 0 1024 1024" className="w-4 h-4 inline-block mr-1 -mt-0.5 align-middle" fill={copied ? "#e6e6e6" : "currentColor"}><path d="M704 384v512H192V384h512m32-64h-576a32 32 0 0 0-32 32v576a32 32 0 0 0 32 32h576a32 32 0 0 0 32-32v-576a32 32 0 0 0-32-32z"/><path d="M320 512m32 0l192 0q32 0 32 32l0 0q0 32-32 32l-192 0q-32 0-32-32l0 0q0-32 32-32Z"/><path d="M320 704m32 0l192 0q32 0 32 32l0 0q0 32-32 32l-192 0q-32 0-32-32l0 0q0-32 32-32Z"/><path d="M928 128h-576a32 32 0 0 0-32 32V256h64V192h512v576h-64v64h96a32 32 0 0 0 32-32v-640a32 32 0 0 0-32-32z"/></svg>
+            {copied ? "已复制" : "分享"}
+          </button>
         </div>
       )}
 
-      {phase === "playing" && (
+      {phase !== "idle" && (
+        <VerifierPanel displayOrder={displayOrder} />
+      )}
+      {phase === "playing" && gamePhase === "code-input" && (
+        <div className="border rounded-xl bg-white p-3 min-h-[17rem] flex flex-col sticky bottom-4 z-10 shadow-lg">
+          <CodeInput
+            value={proposal}
+            onChange={setProposal}
+            locked={false}
+          />
+          <div className="mt-auto">
+            <GameControls
+            phase={phase}
+            gamePhase={gamePhase}
+            canTest={canTest}
+            onConfirmCode={confirmCode}
+            onTest={() => testVerifier()}
+            onNextRound={nextRound}
+            onSubmitAnswer={() => {
+              setSubmitCode([1, 1, 1]);
+              setShowSubmitModal(true);
+            }}
+            onNewGame={() => navigate("/")}
+          />
+        </div>
+        </div>
+      )}
+
+      {phase === "playing" && gamePhase === "verifier-select" && confirmedCode && (
+        <div className="border rounded-xl bg-white p-3 min-h-[17rem] flex flex-col sticky bottom-4 z-10 shadow-lg">
+          <div className="flex-1 space-y-3">
+            <div className="border rounded-lg bg-gray-50 p-3">
+              <div className="text-center">
+                <div className="text-sm font-bold text-gray-500 mb-1.5">本轮密码</div>
+                <div className="flex items-center justify-center gap-4">
+                  {confirmedCode.map((d, i) => (
+                    <span key={i} className="flex flex-col items-center gap-0.5">
+                      <ColorShape index={i} size={22} />
+                      <span className="text-2xl font-bold text-gray-800 leading-none">{d}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-sm text-gray-500 mb-2">
+                选择要测试的验证器
+                <span className="ml-2 text-gray-400">
+                  {roundVerifyCount >= 3 ? "已达上限" : `${roundVerifyCount}/3`}
+                </span>
+              </div>
+              <div className="flex justify-center gap-1.5">
+                {Array.from({ length: verifiers.length }, (_, i) => {
+                  const tested = testedCards.has(i);
+                  const selected = selectedVerifierIndex === i;
+                  const result = testResults[i];
+                  const borderClass = tested
+                    ? result ? "border-3 border-green-500" : "border-3 border-red-500"
+                    : selected ? "" : "border-3 border-gray-200";
+                  return (
+                    <button
+                      key={i}
+                      disabled={tested || roundVerifyCount >= 3}
+                      onClick={() => selectVerifier(i)}
+                      className={
+                        `w-10 h-10 rounded-lg text-base font-bold transition-colors ` +
+                        (tested
+                          ? "bg-gray-100 text-gray-300"
+                          : selected
+                            ? "bg-[#2db563] text-white shadow-sm"
+                            : "bg-white text-gray-700 hover:border-gray-300") +
+                        " " + borderClass
+                      }
+                    >
+                      {LETTERS[i]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
           <GameControls
             phase={phase}
             gamePhase={gamePhase}
@@ -181,7 +191,8 @@ export function Game() {
             }}
             onNewGame={() => navigate("/")}
           />
-        )}
+        </div>
+      )}
 
         {(phase === "solved" || phase === "failed") && (
           <GameControls
@@ -229,40 +240,58 @@ export function Game() {
           <div className="max-w-lg mx-auto space-y-4">
             {gameContent}
           </div>
-          {records.length > 0 && (
-            <>
-              {!showHistoryOverlay ? (
-                <button
-                  onClick={() => setShowHistoryOverlay(true)}
-                  className="fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-white rounded-r-xl shadow-md w-6 h-24 flex items-center justify-center text-sm text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
-                >
-                  <span style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>历史</span>
-                </button>
-              ) : (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                  <div className="bg-white rounded-xl w-full max-w-md max-h-[80vh] overflow-y-auto p-4 relative">
-                    <button
-                      onClick={() => setShowHistoryOverlay(false)}
-                      className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-lg leading-none cursor-pointer"
-                    >
-                      ✕
-                    </button>
-                    <TestHistory records={records} totalCards={verifiers.length} />
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          <button
+            onClick={() => setShowHistoryOverlay(true)}
+            className={"fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-[#56b3dc] rounded-r-xl shadow-md w-6 py-3 flex flex-col items-center justify-center text-sm font-bold text-white transition-opacity cursor-pointer " + (showHistoryOverlay || showMarkersOverlay ? "opacity-0 pointer-events-none" : "")}
+          >
+            <span className="flex flex-col items-center gap-1">{"历史记录".split("").map((c, i) => <span key={i}>{c}</span>)}</span>
+          </button>
+          <button
+            onClick={() => setShowMarkersOverlay(true)}
+            className={"fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-[#febc11] rounded-l-xl shadow-md w-6 py-3 flex flex-col items-center justify-center text-sm font-bold text-white transition-opacity cursor-pointer " + (showHistoryOverlay || showMarkersOverlay ? "opacity-0 pointer-events-none" : "")}
+          >
+            <span className="flex flex-col items-center gap-1">{"标记".split("").map((c, i) => <span key={i}>{c}</span>)}</span>
+          </button>
+          <div className={"fixed inset-0 bg-black/50 z-50 flex items-center justify-start p-4 transition-opacity " + (showHistoryOverlay ? "" : "opacity-0 pointer-events-none")} onClick={() => setShowHistoryOverlay(false)}>
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setShowHistoryOverlay(false)}
+                className="absolute -top-2 -right-2 z-10 w-6 h-6 bg-white rounded-full shadow flex items-center justify-center text-gray-400 hover:text-gray-600 text-sm leading-none cursor-pointer"
+              >
+                ✕
+              </button>
+              <div className="bg-white rounded-xl p-4 max-h-[80vh] overflow-y-auto" style={{ width: "fit-content", minWidth: "300px" }}>
+                <div className="text-sm font-bold text-slate-500 mb-2 text-center">历史记录</div>
+                <TestHistory records={records} totalCards={verifiers.length} />
+              </div>
+            </div>
+          </div>
+          <div className={"fixed inset-0 bg-black/50 z-50 flex items-center justify-end p-4 transition-opacity " + (showMarkersOverlay ? "" : "opacity-0 pointer-events-none")} onClick={() => setShowMarkersOverlay(false)}>
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setShowMarkersOverlay(false)}
+                className="absolute -top-2 -right-2 z-10 w-6 h-6 bg-white rounded-full shadow flex items-center justify-center text-gray-400 hover:text-gray-600 text-sm leading-none cursor-pointer"
+              >
+                ✕
+              </button>
+              <MarkersBox />
+            </div>
+          </div>
         </>
       ) : (
-        <div className="flex items-start justify-center gap-4">
-          <div className="sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto shrink-0">
-            <TestHistory records={records} totalCards={verifiers.length} />
-          </div>
-          <div className="flex-1 max-w-lg space-y-4">
+        <div className="max-w-lg mx-auto relative">
+          <div className="space-y-4">
             {gameContent}
           </div>
-          <div className="shrink-0 w-8" />
+          <div className="fixed top-1/2 -translate-y-1/2" style={{ right: 'calc(50% + 16rem + 1rem)' }}>
+            <div className="max-h-[calc(100vh-2rem)] overflow-y-auto">
+              <div className="text-sm font-bold text-slate-500 mb-1 text-center">历史记录</div>
+              <TestHistory records={records} totalCards={verifiers.length} />
+            </div>
+          </div>
+          <div className="fixed top-1/2 -translate-y-1/2" style={{ left: 'calc(50% + 16rem + 1rem)' }}>
+            <MarkersBox />
+          </div>
         </div>
       )}
     </div>

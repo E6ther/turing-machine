@@ -34,6 +34,7 @@ export interface Problem {
   ind: number[];
   mode: number;
   fake?: number[];
+  hash: string;
 }
 
 export interface TestRecord {

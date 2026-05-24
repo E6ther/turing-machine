@@ -18,7 +18,7 @@ export function CodeInput({
   onSubmitCode,
 }: CodeInputProps) {
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-3">
       <h2 className="text-lg font-bold">
         {submitMode ? "提交最终答案" : locked ? "本轮密码" : "选择密码"}
       </h2>

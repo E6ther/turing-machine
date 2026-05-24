@@ -13,6 +13,7 @@ interface GameState {
   selectedVerifierIndex: number | null;
   currentRound: number;
   mode: number;
+  hash: string;
 
   setProblem: (p: Problem) => void;
   setProposal: (code: Code) => void;
@@ -46,6 +47,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   selectedVerifierIndex: null,
   currentRound: 1,
   mode: 0,
+  hash: "",
 
   setProblem: (p) => set({
     problem: p,
@@ -59,6 +61,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     selectedVerifierIndex: null,
     currentRound: 1,
     mode: p.mode,
+    hash: p.hash,
   }),
 
   setProposal: (code) => set({ proposal: code }),

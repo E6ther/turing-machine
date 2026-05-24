@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchRandomProblem, type GameSettings } from "../core/apiScraper";
+import { fetchRandomProblem, fetchProblemByHash, type GameSettings } from "../core/apiScraper";
 import { resolveProblem } from "../core/machine";
 import { useGameStore } from "../store/gameStore";
 import { useLayout } from "../hooks/useLayout";
@@ -12,9 +12,9 @@ const MODES = [
 ];
 
 const DIFFICULTIES = [
-  { value: 1, label: "简单", desc: "适合新手" },
-  { value: 2, label: "标准", desc: "正常难度" },
-  { value: 3, label: "困难", desc: "极具挑战" },
+  { value: 0, label: "简单" },
+  { value: 1, label: "标准" },
+  { value: 2, label: "困难" },
 ];
 
 const VERIFIER_OPTIONS = [4, 5, 6];
@@ -26,7 +26,7 @@ function OptionGroup<T extends string | number>({
   onChange,
 }: {
   label: string;
-  options: { value: T; label: string; desc: string }[];
+  options: { value: T; label: string; desc?: string }[];
   value: T;
   onChange: (v: T) => void;
 }) {
@@ -39,7 +39,7 @@ function OptionGroup<T extends string | number>({
             key={opt.value}
             onClick={() => onChange(opt.value)}
             className={
-              `border-2 rounded-xl p-3 text-left transition-all ` +
+              `border-2 rounded-xl py-4 text-center transition-all ` +
               (value === opt.value
                 ? "border-[#2db563] bg-[#e8f8ef] shadow-sm"
                 : "border-gray-200 bg-white hover:border-gray-300")
@@ -53,7 +53,7 @@ function OptionGroup<T extends string | number>({
             >
               {opt.label}
             </div>
-            <div className="text-xs text-gray-400 mt-0.5">{opt.desc}</div>
+            {opt.desc && <div className="text-xs text-gray-400 mt-0.5">{opt.desc}</div>}
           </button>
         ))}
       </div>
@@ -67,8 +67,9 @@ export function Setup() {
   const setProblem = useGameStore((s) => s.setProblem);
 
   const [mode, setMode] = useState(0);
-  const [difficulty, setDifficulty] = useState(2);
+  const [difficulty, setDifficulty] = useState(1);
   const [verifierCount, setVerifierCount] = useState(4);
+  const [searchHash, setSearchHash] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleStart = async () => {
@@ -90,19 +91,36 @@ export function Setup() {
     }
   };
 
+  const handleSearchByHash = async () => {
+    const trimmed = searchHash.replace(/^#/, "").trim();
+    if (!trimmed) return;
+    setLoading(true);
+    try {
+      const api = await fetchProblemByHash(trimmed);
+      const problem = resolveProblem(api);
+      setProblem(problem);
+      navigate("/game");
+    } catch {
+      alert("未找到该谜题，请检查 hash 是否正确");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const titleSize = layout.isMobile ? "text-3xl" : "text-4xl";
   const padding = layout.isMobile ? "p-4" : "p-6";
 
   return (
     <div className={`min-h-dvh bg-gradient-to-b from-slate-50 to-slate-100 ${padding}`}>
-      <div className="max-w-lg mx-auto space-y-6">
+      <div className="max-w-lg mx-auto">
         <button
           onClick={() => navigate("/")}
-          className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
+          className="text-sm text-slate-400 hover:text-slate-600 transition-colors mb-4"
         >
           &larr; 返回首页
         </button>
 
+        <div className="space-y-6 text-center">
         <h1 className={`${titleSize} font-bold text-slate-800`}>游戏设置</h1>
 
         <OptionGroup
@@ -151,7 +169,28 @@ export function Setup() {
         >
           {loading ? "加载中..." : "开始游戏"}
         </button>
+
+        <div className="border-t border-gray-200 pt-6">
+          <h2 className="text-sm font-bold text-slate-500 mb-2">搜索谜题</h2>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={searchHash}
+              onChange={(e) => setSearchHash(e.target.value)}
+              placeholder="输入 hash，如 #B4D N5A"
+              className="flex-1 border-2 border-gray-200 rounded-xl px-4 py-3 text-sm font-mono outline-none focus:border-[#56b3dc] transition-colors"
+            />
+            <button
+              onClick={handleSearchByHash}
+              disabled={loading || !searchHash.trim()}
+              className="px-4 py-3 bg-[#56b3dc] text-white rounded-xl font-bold text-sm hover:bg-[#4aa0c7] transition-colors disabled:opacity-50"
+            >
+              搜索
+            </button>
+          </div>
+        </div>
       </div>
+    </div>
     </div>
   );
 }
