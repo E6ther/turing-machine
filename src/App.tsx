@@ -4,8 +4,9 @@ import { Setup } from "./pages/Setup";
 import { Game } from "./pages/Game";
 
 function App() {
+  const basename = import.meta.env.BASE_URL.replace(/\/$/, "");
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/setup" element={<Setup />} />
