@@ -84,8 +84,8 @@ export function Setup() {
       })));
       setProblem(problem);
       navigate("/game");
-    } catch {
-      alert("获取题目失败，请检查网络连接或调整设置");
+    } catch (e) {
+      alert("获取题目失败: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setLoading(false);
     }
@@ -100,8 +100,8 @@ export function Setup() {
       const problem = resolveProblem(api);
       setProblem(problem);
       navigate("/game");
-    } catch {
-      alert("未找到该谜题，请检查 hash 是否正确");
+    } catch (e) {
+      alert("未找到该谜题: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setLoading(false);
     }
