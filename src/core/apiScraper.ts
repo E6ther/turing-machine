@@ -30,18 +30,27 @@ function generateUUID(): string {
   });
 }
 
+function apiUrl(params: string): string {
+  if (import.meta.env.PROD) {
+    return `https://turingmachine.info/api/api.php?${params}`;
+  }
+  return `/api/api.php?${params}`;
+}
+
 export async function fetchRandomProblem(settings?: GameSettings): Promise<ApiResponse> {
   const uuid = generateUUID();
   const params = settings
     ? `uuid=${uuid}&m=${settings.m}&d=${settings.d}&n=${settings.n}`
     : `uuid=${uuid}&s=0`;
-  const res = await fetch(`/api/api.php?${params}`, {
+  const res = await fetch(apiUrl(params), {
     headers: {
       Referer: "https://turingmachine.info/",
       Origin: "https://turingmachine.info",
     },
   });
-  const data: ApiResponse = await res.json();
+  const text = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+  const data: ApiResponse = JSON.parse(text);
   if (data.status !== "ok") throw new Error("API returned bad status");
   return data;
 }
@@ -49,13 +58,15 @@ export async function fetchRandomProblem(settings?: GameSettings): Promise<ApiRe
 export async function fetchProblemByHash(hash: string): Promise<ApiResponse> {
   const uuid = generateUUID();
   const h = hash.replace(/^#/, "").trim();
-  const res = await fetch(`/api/api.php?uuid=${uuid}&h=${encodeURIComponent(h)}`, {
+  const res = await fetch(apiUrl(`uuid=${uuid}&h=${encodeURIComponent(h)}`), {
     headers: {
       Referer: "https://turingmachine.info/",
       Origin: "https://turingmachine.info",
     },
   });
-  const data: ApiResponse = await res.json();
+  const text = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+  const data: ApiResponse = JSON.parse(text);
   if (data.status !== "ok") throw new Error("API returned bad status");
   return data;
 }
