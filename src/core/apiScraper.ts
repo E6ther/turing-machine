@@ -30,11 +30,47 @@ function generateUUID(): string {
   });
 }
 
-function apiUrl(params: string): string {
-  if (import.meta.env.PROD) {
-    return `https://turingmachine.info/api/api.php?${params}`;
+const TARGET = "https://turingmachine.info/api/api.php";
+const PROXY_CHAIN = [
+  (u: string) => u,
+  (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
+
+const headers = {
+  Referer: "https://turingmachine.info/",
+  Origin: "https://turingmachine.info",
+};
+
+async function fetchApi(params: string): Promise<ApiResponse> {
+  const targetUrl = `${TARGET}?${params}`;
+
+  if (!import.meta.env.PROD) {
+    const res = await fetch(`/api/api.php?${params}`, { headers });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+    return JSON.parse(text);
   }
-  return `/api/api.php?${params}`;
+
+  for (const buildUrl of PROXY_CHAIN) {
+    try {
+      const url = buildUrl(targetUrl);
+      console.log("[API] trying:", url.slice(0, 120));
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      const text = await res.text();
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+      const data: ApiResponse = JSON.parse(text);
+      if (data.status !== "ok") throw new Error("API returned bad status");
+      return data;
+    } catch (err) {
+      console.warn("[API] failed:", err);
+    }
+  }
+  throw new Error("所有请求方式均失败，可能是网络或CORS限制");
 }
 
 export async function fetchRandomProblem(settings?: GameSettings): Promise<ApiResponse> {
@@ -42,31 +78,11 @@ export async function fetchRandomProblem(settings?: GameSettings): Promise<ApiRe
   const params = settings
     ? `uuid=${uuid}&m=${settings.m}&d=${settings.d}&n=${settings.n}`
     : `uuid=${uuid}&s=0`;
-  const res = await fetch(apiUrl(params), {
-    headers: {
-      Referer: "https://turingmachine.info/",
-      Origin: "https://turingmachine.info",
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
-  const data: ApiResponse = JSON.parse(text);
-  if (data.status !== "ok") throw new Error("API returned bad status");
-  return data;
+  return fetchApi(params);
 }
 
 export async function fetchProblemByHash(hash: string): Promise<ApiResponse> {
   const uuid = generateUUID();
   const h = hash.replace(/^#/, "").trim();
-  const res = await fetch(apiUrl(`uuid=${uuid}&h=${encodeURIComponent(h)}`), {
-    headers: {
-      Referer: "https://turingmachine.info/",
-      Origin: "https://turingmachine.info",
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 100)}`);
-  const data: ApiResponse = JSON.parse(text);
-  if (data.status !== "ok") throw new Error("API returned bad status");
-  return data;
+  return fetchApi(`uuid=${uuid}&h=${encodeURIComponent(h)}`);
 }
