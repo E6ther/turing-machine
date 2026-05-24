@@ -23,7 +23,7 @@ export function TestHistory({ records, totalCards }: TestHistoryProps) {
   return (
     <div>
       <h3 className="text-base font-bold mb-1 text-gray-500">历史记录</h3>
-      <div className="max-h-64 overflow-y-auto">
+      <div className="overflow-y-auto">
         <div className="text-base font-mono leading-tight">
           <div className="flex items-center pt-1 pb-1.5 relative">
             <div className="w-7 flex-shrink-0" />
