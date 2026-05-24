@@ -47,45 +47,22 @@ function rebuildVerifiers(lawIds: number[]): ActiveVerifier[] {
   return lawIds.map((lawId) => ({ lawId, fn: getLawFn(lawId) }));
 }
 
-const persistStorage = {
-  getItem: (name: string) => {
-    const raw = localStorage.getItem(name);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    const state = parsed?.state;
-    if (state) {
-      const lawIds: number[] = state.verifiers ?? [];
-      state.verifiers = rebuildVerifiers(lawIds);
-      if (state.problem) {
-        const plawIds: number[] = state.problem.verifiers ?? [];
-        state.problem.verifiers = rebuildVerifiers(plawIds);
-      }
-      state.displayOrder = buildDisplayOrder(
-        state.problem?.ind ?? [],
-        state.mode ?? 0,
-        state.problem?.fake,
-      );
-    }
-    return parsed;
-  },
-  setItem: (name: string, value: unknown) => {
-    const state = (value as Record<string, unknown>)?.state as Record<string, unknown> | undefined;
-    if (state) {
-      if (Array.isArray(state.verifiers)) {
-        state.verifiers = (state.verifiers as ActiveVerifier[]).map((v) => v.lawId);
-      }
-      if (state.problem && typeof state.problem === "object") {
-        const p = state.problem as Record<string, unknown>;
-        if (Array.isArray(p.verifiers)) {
-          p.verifiers = (p.verifiers as ActiveVerifier[]).map((v) => v.lawId);
-        }
-      }
-      delete state.displayOrder;
-    }
-    localStorage.setItem(name, JSON.stringify(value));
-  },
-  removeItem: (name: string) => localStorage.removeItem(name),
-};
+interface PersistedState {
+  lawIds: number[];
+  records: TestRecord[];
+  markers: Record<string, Mark>;
+  phase: "idle" | "playing" | "solved" | "failed";
+  gamePhase: "code-input" | "verifier-select";
+  confirmedCode: Code | null;
+  proposal: Code;
+  selectedVerifierIndex: number | null;
+  currentRound: number;
+  mode: number;
+  hash: string;
+  secretCode?: Code;
+  ind?: number[];
+  fake?: number[];
+}
 
 export const useGameStore = create<GameState>()(
   persist(
@@ -208,7 +185,46 @@ export const useGameStore = create<GameState>()(
     }),
     {
       name: "turing-machine-game",
-      storage: persistStorage,
+      partialize: (state) => ({
+        lawIds: state.verifiers.map((v) => v.lawId),
+        records: state.records,
+        markers: state.markers,
+        phase: state.phase,
+        gamePhase: state.gamePhase,
+        confirmedCode: state.confirmedCode,
+        proposal: state.proposal,
+        selectedVerifierIndex: state.selectedVerifierIndex,
+        currentRound: state.currentRound,
+        mode: state.mode,
+        hash: state.hash,
+        secretCode: state.problem?.secretCode,
+        ind: state.problem?.ind,
+        fake: state.problem?.fake,
+      }),
+      merge: (persisted, current) => {
+        const p = persisted as unknown as PersistedState;
+        const lawIds = p.lawIds ?? [];
+        const verifiers = rebuildVerifiers(lawIds);
+        const problem: Problem | null = p.secretCode
+          ? { secretCode: p.secretCode, verifiers, ind: p.ind ?? [], mode: p.mode ?? 0, fake: p.fake, hash: p.hash ?? "" }
+          : null;
+        return {
+          ...current,
+          problem,
+          verifiers,
+          displayOrder: problem ? buildDisplayOrder(problem.ind, problem.mode, problem.fake) : [],
+          records: p.records ?? [],
+          markers: p.markers ?? {},
+          phase: p.phase ?? "idle",
+          gamePhase: p.gamePhase ?? "code-input",
+          confirmedCode: p.confirmedCode ?? null,
+          proposal: p.proposal ?? [1, 1, 1],
+          selectedVerifierIndex: p.selectedVerifierIndex ?? null,
+          currentRound: p.currentRound ?? 1,
+          mode: p.mode ?? 0,
+          hash: p.hash ?? "",
+        };
+      },
     },
   ),
 );
