@@ -144,9 +144,9 @@ export function Game() {
             </div>
 
             <div className="text-center pb-4">
-              <div className="text-sm text-gray-500 mb-2">
+              <div className="text-sm font-bold text-gray-700 mb-2">
                 选择要测试的验证器
-                <span className="ml-2 text-gray-400">
+                <span className="ml-2 text-gray-600">
                   {roundVerifyCount >= 3 ? "已达上限" : `${roundVerifyCount}/3`}
                 </span>
               </div>

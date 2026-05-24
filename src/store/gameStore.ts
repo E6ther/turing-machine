@@ -116,8 +116,12 @@ export const useGameStore = create<GameState>()(
         })),
 
       testVerifier: () => {
-        const { confirmedCode, verifiers, selectedVerifierIndex, currentRound } = get();
+        const { confirmedCode, verifiers, selectedVerifierIndex, currentRound, records } = get();
         if (!confirmedCode || selectedVerifierIndex === null) return null;
+        const alreadyTested = records.some(
+          (r) => r.round === currentRound && r.cardIndex === selectedVerifierIndex
+        );
+        if (alreadyTested) return null;
         const result = verifiers[selectedVerifierIndex].fn(confirmedCode);
         const record: TestRecord = {
           round: currentRound,
@@ -125,7 +129,10 @@ export const useGameStore = create<GameState>()(
           cardIndex: selectedVerifierIndex,
           result,
         };
-        set((s) => ({ records: [...s.records, record] }));
+        set((s) => ({
+          records: [...s.records, record],
+          selectedVerifierIndex: null,
+        }));
         return result;
       },
 
