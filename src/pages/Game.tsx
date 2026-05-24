@@ -34,12 +34,14 @@ export function Game() {
   const backToCodeInput = useGameStore((s) => s.backToCodeInput);
   const nextRound = useGameStore((s) => s.nextRound);
   const hash = useGameStore((s) => s.hash);
+  const par = useGameStore((s) => s.par);
 
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [submitView, setSubmitView] = useState<"none" | "input" | "correct" | "incorrect" | "answer-revealed">("none");
+  const [submitCode, setSubmitCode] = useState<Code>([1, 1, 1]);
   const [copied, setCopied] = useState(false);
+  const [overlayCopied, setOverlayCopied] = useState(false);
   const [showHistoryOverlay, setShowHistoryOverlay] = useState(false);
   const [showMarkersOverlay, setShowMarkersOverlay] = useState(false);
-  const [submitCode, setSubmitCode] = useState<Code>([1, 1, 1]);
 
   useEffect(() => {
     if (!problem) navigate("/", { replace: true });
@@ -113,8 +115,8 @@ export function Game() {
             onTest={() => testVerifier()}
             onNextRound={nextRound}
             onSubmitAnswer={() => {
-              setSubmitCode([1, 1, 1]);
-              setShowSubmitModal(true);
+              setSubmitCode([...proposal]);
+              setSubmitView("input");
             }}
             onNewGame={() => navigate("/")}
           />
@@ -186,8 +188,8 @@ export function Game() {
             onNextRound={nextRound}
             onBackToCodeInput={backToCodeInput}
             onSubmitAnswer={() => {
-              setSubmitCode([1, 1, 1]);
-              setShowSubmitModal(true);
+              setSubmitCode([...proposal]);
+              setSubmitView("input");
             }}
             onNewGame={() => navigate("/")}
           />
@@ -207,26 +209,199 @@ export function Game() {
           />
         )}
 
-      {showSubmitModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full space-y-4 shadow-xl">
-            <h2 className="text-lg font-bold text-center">提交最终答案</h2>
-            <CodeInput
-              value={submitCode}
-              onChange={setSubmitCode}
-              locked={false}
-              submitMode
-              onSubmitCode={() => {
-                submitFinalAnswer(submitCode);
-                setShowSubmitModal(false);
-              }}
-            />
-            <button
-              onClick={() => setShowSubmitModal(false)}
-              className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              取消
-            </button>
+      {submitView !== "none" && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl space-y-4">
+
+            {submitView === "input" && (
+              <>
+                <h2 className="text-lg font-bold text-center">提交最终答案</h2>
+                {hash && (
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-base font-black font-mono text-slate-800">#{hash}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`#${hash.replace(/\s+/g, "")}`);
+                        setOverlayCopied(true);
+                        setTimeout(() => setOverlayCopied(false), 2000);
+                      }}
+                      className="text-xs font-bold text-white bg-gray-800 hover:bg-gray-700 rounded-lg px-2 py-1 transition-colors cursor-pointer"
+                    >
+                      {overlayCopied ? "已复制" : "分享"}
+                    </button>
+                  </div>
+                )}
+                <CodeInput
+                  value={submitCode}
+                  onChange={setSubmitCode}
+                  locked={false}
+                  hideTitle
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setSubmitView("none")}
+                    className="flex-1 py-3 bg-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-300 transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={() => {
+                      const correct = submitFinalAnswer(submitCode);
+                      setSubmitView(correct ? "correct" : "incorrect");
+                    }}
+                    className="flex-1 py-3 bg-[#2db563] text-white rounded-lg font-bold hover:bg-[#259e56] transition-colors"
+                  >
+                    提交
+                  </button>
+                </div>
+              </>
+            )}
+
+            {submitView === "correct" && (
+              <div className="space-y-4 text-center">
+                <div className="text-xl font-bold text-green-600">✅ 答案正确！</div>
+                {hash && (
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-base font-black font-mono text-slate-800">#{hash}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`#${hash.replace(/\s+/g, "")}`);
+                        setOverlayCopied(true);
+                        setTimeout(() => setOverlayCopied(false), 2000);
+                      }}
+                      className="text-xs font-bold text-white bg-gray-800 hover:bg-gray-700 rounded-lg px-2 py-1 transition-colors cursor-pointer"
+                    >
+                      {overlayCopied ? "已复制" : "分享"}
+                    </button>
+                  </div>
+                )}
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p>
+                    你找出密码花费了<br />
+                    <span className="font-bold">{new Set(records.map(r => r.round)).size} 轮</span>{" "}
+                    <span className="font-bold">{records.length} 个问题</span>
+                  </p>
+                  <p>
+                    图灵机花费了<br />
+                    <span className="font-bold">{Math.ceil(par / 3)} 轮</span>{" "}
+                    <span className="font-bold">{par} 个问题</span>
+                  </p>
+                </div>
+                {(() => {
+                  const playerRounds = new Set(records.map(r => r.round)).size;
+                  const playerQuestions = records.length;
+                  const tmRounds = Math.ceil(par / 3);
+                  const won = playerRounds <= tmRounds && playerQuestions <= par;
+                  return (
+                    <div className={`rounded-lg py-3 px-4 font-bold ${won ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                      {won ? "恭喜你战胜了图灵机！" : "很抱歉你没有战胜图灵机"}
+                    </div>
+                  );
+                })()}
+                <button
+                  onClick={() => {
+                    useGameStore.setState({ phase: "solved" });
+                    navigate("/");
+                  }}
+                  className="w-full py-3 bg-[#2db563] text-white rounded-lg font-bold hover:bg-[#259e56] transition-colors"
+                >
+                  回到主页
+                </button>
+              </div>
+            )}
+
+            {submitView === "incorrect" && (
+              <div className="space-y-4 text-center">
+                <div className="text-xl font-bold text-red-600">❌ 答案错误</div>
+                {hash && (
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-base font-black font-mono text-slate-800">#{hash}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`#${hash.replace(/\s+/g, "")}`);
+                        setOverlayCopied(true);
+                        setTimeout(() => setOverlayCopied(false), 2000);
+                      }}
+                      className="text-xs font-bold text-white bg-gray-800 hover:bg-gray-700 rounded-lg px-2 py-1 transition-colors cursor-pointer"
+                    >
+                      {overlayCopied ? "已复制" : "分享"}
+                    </button>
+                  </div>
+                )}
+                <p className="text-sm text-gray-600">
+                  密码不是{" "}
+                  {submitCode.map((d, i) => (
+                    <span key={i} className="inline-flex items-center gap-0.5 mx-0.5">
+                      <ColorShape index={i} size={14} />
+                      <span className="font-bold">{d}</span>
+                    </span>
+                  ))}
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => setSubmitView("none")}
+                    className="px-6 py-3 bg-[#56b3dc] text-white rounded-lg font-bold hover:bg-[#4a9ec4] transition-colors"
+                  >
+                    继续
+                  </button>
+                  <button
+                    onClick={() => setSubmitView("answer-revealed")}
+                    className="px-6 py-3 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition-colors"
+                  >
+                    查看答案
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {submitView === "answer-revealed" && (
+              <div className="space-y-4 text-center">
+                <div className="text-xl font-bold text-red-600">❌ 答案错误</div>
+                {hash && (
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-base font-black font-mono text-slate-800">#{hash}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`#${hash.replace(/\s+/g, "")}`);
+                        setOverlayCopied(true);
+                        setTimeout(() => setOverlayCopied(false), 2000);
+                      }}
+                      className="text-xs font-bold text-white bg-gray-800 hover:bg-gray-700 rounded-lg px-2 py-1 transition-colors cursor-pointer"
+                    >
+                      {overlayCopied ? "已复制" : "分享"}
+                    </button>
+                  </div>
+                )}
+                <p className="text-sm text-gray-600">
+                  密码不是{" "}
+                  {submitCode.map((d, i) => (
+                    <span key={i} className="inline-flex items-center gap-0.5 mx-0.5">
+                      <ColorShape index={i} size={14} />
+                      <span className="font-bold">{d}</span>
+                    </span>
+                  ))}
+                </p>
+                <p className="text-sm text-gray-600">
+                  正确密码:{" "}
+                  {problem.secretCode.map((d, i) => (
+                    <span key={i} className="inline-flex items-center gap-0.5 mx-0.5">
+                      <ColorShape index={i} size={14} />
+                      <span className="font-bold text-green-600">{d}</span>
+                    </span>
+                  ))}
+                </p>
+                <button
+                  onClick={() => {
+                    useGameStore.setState({ phase: "failed" });
+                    navigate("/");
+                  }}
+                  className="w-full py-3 bg-[#2db563] text-white rounded-lg font-bold hover:bg-[#259e56] transition-colors"
+                >
+                  回到主页
+                </button>
+              </div>
+            )}
+
           </div>
         </div>
       )}

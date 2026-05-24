@@ -60,11 +60,11 @@ export function GameControls({
           onClick={onConfirmCode}
           className="px-6 py-3 bg-[#2db563] text-white rounded-lg font-bold hover:bg-[#259e56] transition-colors"
         >
-          确认密码
+          验证密码
         </button>
         <button
           onClick={onSubmitAnswer}
-          className="px-6 py-3 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition-colors"
+          className="px-6 py-3 bg-[#7f66ad] text-white rounded-lg font-bold hover:bg-[#6a58a0] transition-colors"
         >
           提交答案
         </button>

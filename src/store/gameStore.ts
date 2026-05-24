@@ -18,6 +18,7 @@ interface GameState {
   currentRound: number;
   mode: number;
   hash: string;
+  par: number;
   markers: Record<string, Mark>;
 
   setProblem: (p: Problem) => void;
@@ -59,6 +60,7 @@ interface PersistedState {
   currentRound: number;
   mode: number;
   hash: string;
+  par: number;
   secretCode?: Code;
   ind?: number[];
   fake?: number[];
@@ -79,6 +81,7 @@ export const useGameStore = create<GameState>()(
       currentRound: 1,
       mode: 0,
       hash: "",
+      par: 0,
       markers: {},
 
       setProblem: (p) => set({
@@ -94,6 +97,7 @@ export const useGameStore = create<GameState>()(
         currentRound: 1,
         mode: p.mode,
         hash: p.hash,
+        par: p.par,
         markers: {},
       }),
 
@@ -128,12 +132,11 @@ export const useGameStore = create<GameState>()(
       submitFinalAnswer: (code) => {
         const { problem } = get();
         if (!problem) return false;
-        const correct =
+        return (
           code[0] === problem.secretCode[0] &&
           code[1] === problem.secretCode[1] &&
-          code[2] === problem.secretCode[2];
-        set({ phase: correct ? "solved" : "failed" });
-        return correct;
+          code[2] === problem.secretCode[2]
+        );
       },
 
       backToCodeInput: () =>
@@ -180,6 +183,7 @@ export const useGameStore = create<GameState>()(
         currentRound: 1,
         mode: 0,
         hash: "",
+        par: 0,
         markers: {},
       }),
     }),
@@ -197,6 +201,7 @@ export const useGameStore = create<GameState>()(
         currentRound: state.currentRound,
         mode: state.mode,
         hash: state.hash,
+        par: state.par,
         secretCode: state.problem?.secretCode,
         ind: state.problem?.ind,
         fake: state.problem?.fake,
@@ -206,7 +211,7 @@ export const useGameStore = create<GameState>()(
         const lawIds = p.lawIds ?? [];
         const verifiers = rebuildVerifiers(lawIds);
         const problem: Problem | null = p.secretCode
-          ? { secretCode: p.secretCode, verifiers, ind: p.ind ?? [], mode: p.mode ?? 0, fake: p.fake, hash: p.hash ?? "" }
+          ? { secretCode: p.secretCode, verifiers, ind: p.ind ?? [], mode: p.mode ?? 0, fake: p.fake, hash: p.hash ?? "", par: p.par ?? 0 }
           : null;
         return {
           ...current,
@@ -223,6 +228,7 @@ export const useGameStore = create<GameState>()(
           currentRound: p.currentRound ?? 1,
           mode: p.mode ?? 0,
           hash: p.hash ?? "",
+          par: p.par ?? 0,
         };
       },
     },

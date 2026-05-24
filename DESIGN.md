@@ -32,8 +32,9 @@ turing-machine/
 │   │   ├── CodeInput.tsx       # 3 位数输入 + 确认密码按钮
 │   │   ├── VerifierPanel.tsx   # 验证器卡片图片展示
 │   │   ├── GameControls.tsx    # 阶段驱动按钮组
-│   │   ├── TestHistory.tsx     # 历史记录（按轮次分组）
-│   │   └── ColorShape.tsx      # ▲■● 形状 SVG
+│   │   ├── TestHistory.tsx     # 历史记录（表格展示，含占位行）
+│   │   ├── ColorShape.tsx      # ▲■● 形状 SVG
+│   │   └── MarkersBox.tsx      # 标记框（数字点击标记 ✓/✗）
 │   ├── pages/
 │   │   ├── Home.tsx            # 首页
 │   │   ├── Setup.tsx           # 游戏设置页（m/d/n 参数）
@@ -94,6 +95,7 @@ interface Problem {
   ind: number[];
   mode: number;
   fake?: number[];
+  hash: string;            // API 返回的 hash，用于分享/搜索谜题
 }
 
 // 单次验证记录
@@ -200,6 +202,9 @@ displayOrder 各模式构造:
 | `gamePhase` | `"code-input" \| "verifier-select"` | 当前游戏阶段 |
 | `confirmedCode` | `Code \| null` | 本轮已确认的密码 |
 | `selectedVerifierIndex` | `number \| null` | 验证阶段选中的位置下标 |
+| `mode` | `number` | 游戏模式（0/1/2） |
+| `hash` | `string` | API 返回的谜题 hash |
+| `markers` | `Record<string, Mark>` | 标记框状态，key=`"${col}-${digit}"`，value=0/1/2 |
 
 ### 核心动作
 
@@ -212,7 +217,22 @@ displayOrder 各模式构造:
 | `testVerifier()` | [测试] | verifiers[selectedVerifierIndex].fn(confirmedCode)，写入 TestRecord |
 | `nextRound()` | [下一轮] | 仅复位阶段，不做排序/洗牌 |
 | `submitFinalAnswer(code)` | [提交] 弹窗 | 比对 code 与 secretCode → solved / failed |
-| `reset()` | [重新开始] | 全部清空 |
+| `backToCodeInput()` | [返回] | 从验证阶段退回编码阶段（不递增轮次） |
+| `cycleMarker(col, d)` | 标记框点击 | 循环切换标记状态：无→✓(绿)→✗(红)→无 |
+| `clearState()` | 重置 | 全部清空 |
+
+### 持久化
+
+使用 Zustand `persist` 中间件，通过 `partialize` 只存储可序列化的字段，`merge` 回调在加载时重建非序列化字段：
+
+```
+持久化字段: lawIds(替代verifiers), records, markers, phase, gamePhase, confirmedCode, proposal, selectedVerifierIndex, currentRound, mode, hash, secretCode, ind, fake
+重建字段:   verifiers = rebuildVerifiers(lawIds)  // 通过 getLawFn 还原函数引用
+            problem = 从 secretCode/ind/fake/hash 重建
+            displayOrder = buildDisplayOrder(ind, mode, fake)
+```
+
+Home 页面在挂载时检查 localStorage 中是否有 phase===playing 的存档，若有则自动跳转到 /game 继续游戏。
 
 ### displayOrder 构造规则
 
@@ -238,6 +258,7 @@ function resolveProblem(api: ApiResponse): Problem {
     ind: api.ind,
     mode: Number(api.m),
     fake: api.fake,
+    hash: api.hash,            // 保留 hash 用于分享/搜索
   };
 }
 
@@ -251,6 +272,15 @@ function testSingleVerifier(
 }
 ```
 
+### Hash 分享与搜索
+
+游戏页面上方显示 `#{hash}`（title 形式，text-4xl font-black），右侧带"分享"按钮：
+
+- 点击"分享"复制 `#{无空格hash}` 到剪贴板（自动去除中间空格）
+- 按钮状态：点击后显示"已复制" 2 秒，图标颜色变为 `#e6e6e6`
+- 复制的 hash 可在设置页"搜索谜题"中粘贴使用
+- 搜索请求：`GET /api/api.php?uuid=...&h={hash}`
+
 ---
 
 ## 组件职责
@@ -260,8 +290,9 @@ function testSingleVerifier(
 | `VerifierPanel` | 按 displayOrder 展示卡片图片，每组对应一个字母标签。极限模式每组额外显示假卡图。点击可放大预览（仅真实卡）。 |
 | `CodeInput` | ▲ ■ ● 数字选择器（1-5 按钮组），编码阶段显示确认按钮，确认后锁定。支持提交模式弹窗。 |
 | `GameControls` | 根据 phase + gamePhase 渲染按钮组（确认密码/测试/下一轮/提交答案/重新开始） |
-| `TestHistory` | 按轮次分组展示所有历史验证记录 |
-| `ColorShape` | 渲染 ▲(蓝) ■(黄) ●(紫) 三种形状，用于 CodeInput 和 Game 页面 |
+| `TestHistory` | 表格展示所有历史验证记录，含形状表头 + 字母标签，彩色数字方格，灰色虚线分隔行，无记录时显示 10 行占位符 |
+| `ColorShape` | 渲染 ▲(蓝) ■(黄) ●(紫) 三种形状（纯 CSS 绘制） |
+| `MarkersBox` | 标记框：显示 ▲■● 各 1-5 数字，每个数字可点击循环切换三种状态（无/绿色✓/红色✗），状态持久化到 localStorage |
 
 ---
 
@@ -269,8 +300,9 @@ function testSingleVerifier(
 
 | `gamePhase` / `phase` | 显示的按钮 |
 |------------------------|------------|
-| `code-input` | `[确认密码]` `[提交答案]` `[重新开始]` |
-| `verifier-select` | `[测试]` `[下一轮]` `[提交答案]` |
+| `code-input` | `[确认密码]` `[提交答案]` |
+| `verifier-select`（有验证） | `[测试]` `[下一轮]` `[提交答案]` |
+| `verifier-select`（本轮0次验证） | `[测试]` `[返回]` `[提交答案]` — "下一轮"变为"返回"，调用 backToCodeInput |
 | `solved / failed` | `[再来一局]` |
 
 ---
@@ -357,8 +389,19 @@ Response:
 | 设置项 | 参数 | 可选项 |
 |--------|------|--------|
 | 游戏模式 | `m` | 0=经典, 1=极限（含假验证器）, 2=噩梦 |
-| 难度 | `d` | 1=简单, 2=标准, 3=困难（API 不支持 d=3） |
+| 难度 | `d` | 0=简单, 1=标准, 2=困难 |
 | 验证者数量 | `n` | 4, 5, 6 |
+
+### 搜索谜题
+
+在设置页底部可通过 hash 搜索特定谜题：
+
+```
+请求: GET /api/api.php?uuid=...&h={hash}
+响应: 与随机题目相同的 ApiResponse 格式
+```
+
+hash 从游戏页面右上角的分享按钮复制（自动去除空格）。
 
 ---
 
@@ -404,93 +447,226 @@ Response:
 
 ## 页面布局架构
 
-### 宽屏（横屏）— 居中 + 绝对定位侧栏
+### 宽屏（横屏）— 居中 + fixed 侧栏
 
 ```
-                   游戏区域始终居中
-  ←─────────────────────────────────────────→
-          ┌──────┐ ┌───────────────┐ ┌──────┐
-          │ 历史  │ │    游戏区域    │ │ 预留  │
-          │sticky │ │  max-w-lg     │ │sticky│
-          │shrink │ │  w-full       │ │shrink│
-          │  -0   │ │               │ │  -0  │
-          └──────┘ └───────────────┘ └──────┘
-          right-full        │          left-full
-          + mr-4            │          + ml-4
-                          居中
+                    游戏区域始终居中
+  ←──────────────────────────────────────────→
+     ┌──────┐   ┌───────────────┐   ┌──────┐
+     │ 历史  │   │    游戏区域    │   │ 标记  │
+     │fixed  │   │  max-w-lg     │   │fixed │
+     │左侧   │   │  mx-auto      │   │右侧  │
+     └──────┘   └───────────────┘   └──────┘
+ right:calc(50%            │    left:calc(50%
+ +16rem+1rem)              │    +16rem+1rem)
 ```
 
 | 层级 | CSS 实现 | 说明 |
 |------|----------|------|
-| 外层容器 | `flex justify-center min-h-dvh` | 水平居中 |
-| 游戏区域 | `max-w-lg w-full relative` | 作为左右侧栏的定位锚点 |
-| 左侧历史 | `absolute right-full mr-4 sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto shrink-0` | 附着在游戏区域左侧，自身可滚动 |
-| 右侧预留 | `absolute left-full ml-4` | 空容器，未来添加内容时启用 |
+| 外层容器 | `min-h-dvh bg-slate-50` + padding | 全屏背景 |
+| 游戏区域 | `max-w-lg mx-auto relative` | 居中，作为侧栏定位参考 |
+| 左侧历史 | `fixed top-1/2 -translate-y-1/2 right-[calc(50%+16rem+1rem)]` | 垂直居中，附着在游戏左侧 |
+| 右侧标记 | `fixed top-1/2 -translate-y-1/2 left-[calc(50%+16rem+1rem)]` | 垂直居中，附着在游戏右侧 |
 
-- 历史侧栏默认不渲染，有记录时 (`records.length > 0`) 才显示
-- 右栏仅在需要时启用（预留扩展能力）
-- 游戏区域自身无 margin/padding 干扰居中
+- 历史侧栏始终渲染（无记录时显示 10 行占位符）
+- 标记框显示 ▲■● 各 1-5 数字，支持点击标记 ✓/✗
 
-### 竖屏（移动端）— 左侧悬浮按钮 + 弹窗
+### 竖屏（移动端）— 左右悬浮按钮 + 弹窗
 
 ```
 ┌──────────────────────┐
-│                      │
 │                      │
 │      游戏内容         │
 │                      │
-│                      │
-│ ┌────┐               │  ← 左侧居中竖长方形按钮
-│ │    │               │     fixed left-0 top-1/2
-│ │历  │               │     -translate-y-1/2
-│ │史  │               │     w-6 h-24 bg-white
-│ │    │               │     rounded-r-xl shadow
-│ └────┘               │     writing-mode: vertical-rl
+│ ┌────┐     ┌────┐    │  ← 左右居中竖长方形按钮
+│ │历史│     │标记│    │     fixed left/right-0 top-1/2
+│ │记录│     │    │    │     -translate-y-1/2
+│ └────┘     └────┘    │     bg-[#56b3dc] / bg-[#febc11]
 └──────────────────────┘
-   ↓ 点击
+   ↓ 点击按钮
 ┌──────────────────────┐
-│  ┌────────────────┐  │  ← 全屏半透明遮罩
-│  │ ✕ 历史记录     │  │  ← 居中白色卡片 rounded-xl
-│  │                │  │     max-h-[80vh] overflow-y-auto
-│  │  表格内容      │  │     点击右上角 ✕ 关闭
-│  │                │  │
-│  └────────────────┘  │
+│ ████████████████████  │  ← 全屏半透明遮罩
+│ ┌────────────────┐   │  ← 卡片（白色 rounded-xl）
+│ │ ✕              │   │     靠左/靠右显示
+│ │  表格/标记内容  │   │     点击遮罩关闭
+│ │                │   │
+│ └────────────────┘   │
 └──────────────────────┘
 ```
 
-| 状态 | 元素 | 行为 |
-|------|------|------|
-| 默认 | 竖长方形按钮「历史」| `fixed left-0 top-1/2 -translate-y-1/2`，文字竖排 |
-| 点击按钮 | 遮罩 + 白色卡片 | 卡片内展示 `TestHistory`，右上角 `✕` 按钮 |
-| 点击 ✕ | 关闭弹窗 | 回到默认状态，按钮重新出现 |
+| 按钮 | 位置 | 颜色 | 弹窗对齐 |
+|------|------|------|----------|
+| 历史记录 | `left-0` | `bg-[#56b3dc]` (蓝三角色) | `justify-start` (靠左) |
+| 标记 | `right-0` | `bg-[#febc11]` (黄方块色) | `justify-end` (靠右) |
+
+- 关闭按钮使用圆形容器 `w-6 h-6 bg-white rounded-full shadow`，置于内容区右上角外部
+- 弹窗点击遮罩区域自动关闭，内容区点击通过 `stopPropagation` 阻止关闭
 
 ### 游戏操作框（编码/验证）— 底部悬浮
 
-编码框和验证框都使用 `sticky bottom-0 z-10 shadow-lg` 悬浮在屏幕底部：
+编码框和验证框都使用 `sticky bottom-4 z-10 shadow-lg` 悬浮在屏幕底部：
 
-- 向下滚动时，操作框吸附在视口底部，覆盖上方的验证器图片
-- 滚动到页面最底部时，操作框停留在文档流中的自然位置
-- 使用 `flex flex-col` 布局，按钮始终贴在框的底部
-- 两个框通过 `min-h-[18rem]` 保持统一高度
+- 向下滚动时，操作框吸附在视口底部上方 1rem 处，覆盖上方的验证器图片
+- 使用 `flex flex-col` 布局，按钮通过 `mt-auto` 贴在框的底部
+- 两个框通过 `min-h-[17rem]` 保持统一高度
+- `bottom-4` 保证悬浮时与底部有间隙，避免贴紧底边时跳动
 
 ```
 ┌──────────────────────────────┐
 │                              │
-│         游戏内容 / 图片        │  ← 可被操作框覆盖
+│         游戏内容 / 图片        │
 │                              │
-├──────────────────────────────┤  ← sticky bottom-0
+├──────────────────────────────┤  ← sticky bottom-4
 │  ┌────────────────────────┐  │     z-10 shadow-lg
 │  │  本轮密码 ▲2 ■3 ●4     │  │
 │  │  选择要测试的验证器     │  │
 │  │    A  B  C  D          │  │
-│  │  [返回] [测试] [提交]   │  │  ← 贴在底部
+│  │  [返回] [测试] [提交]   │  │  ← mt-auto
 │  └────────────────────────┘  │
 └──────────────────────────────┘
 ```
 
 ### 响应式策略
 
-| 设备 | 历史记录展示方式 |
-|------|-----------------|
-| 宽屏 (`!layout.isMobile`) | 游戏区域左侧 sticky 侧栏 |
-| 竖屏 (`layout.isMobile`) | 左侧悬浮按钮 → 点击弹出全屏浮层 |
+| 设备 | 历史记录展示方式 | 标记展示方式 |
+|------|-----------------|-------------|
+| 宽屏 (`!layout.isMobile`) | 游戏左侧 fixed 侧栏 | 游戏右侧 fixed 侧栏 |
+| 竖屏 (`layout.isMobile`) | 左侧悬浮按钮 → 点击弹出靠左浮层 | 右侧悬浮按钮 → 点击弹出靠右浮层 |
+
+---
+
+## 提交最终答案页面设计
+
+### 入口
+
+游戏任意阶段（`code-input` 或 `verifier-select`）的"提交答案"按钮 → 打开全屏覆层。
+
+### 覆层三视图
+
+#### 视图 A：输入密码
+
+```
+┌──────────────────────────────────┐
+│  ███████████████████████████████  │  bg-black/50 全屏遮罩
+│  ┌──────────────────────────┐    │
+│  │      提交最终答案          │    │  text-lg font-bold 标题
+│  │                          │    │
+│  │  #B4D N5A       [分享]    │    │  hash + 分享，复用现有逻辑
+│  │                          │    │
+│  │  ▲  [1][2][3][4][5]      │    │  CodeInput (hideTitle)
+│  │  ■  [1][2][3][4][5]      │    │  继承当前 proposal 作为初始值
+│  │  ●  [1][2][3][4][5]      │    │
+│  │                          │    │
+│  │  [取消]      [提交]       │    │  取消=bg-gray-200 提交=bg-[#2db563](右侧)
+│  └──────────────────────────┘    │
+└──────────────────────────────────┘
+```
+
+#### 视图 B：结果正确
+
+```
+┌──────────────────────────────┐
+│                              │
+│      ✅ 答案正确！             │  text-green-600 text-xl
+│                              │
+│  #B4D N5A           [分享]    │  ← hash + 分享按钮
+│                              │
+│      你找出密码花费了          │
+│      3 轮 7 个问题            │  玩家实际数据
+│                              │
+│      图灵机花费了             │
+│      2 轮 6 个问题            │  par 数据
+│                              │
+│  ┌────────────────────────┐  │
+│  │ 恭喜你战胜了图灵机！     │  │  绿色卡片 (bg-green-50 text-green-700)
+│  └────────────────────────┘  │
+│  ┌────────────────────────┐  │
+│  │ 很抱歉你没有战胜图灵机   │  │  红色卡片 (bg-red-50 text-red-700)
+│  └────────────────────────┘  │
+│                              │
+│           [回到主页]          │  → set phase="solved", navigate("/")
+└──────────────────────────────┘
+```
+
+#### 视图 C：结果错误
+
+```
+┌──────────────────────────────┐
+│                              │
+│      ❌ 答案错误               │  text-red-600 text-xl
+│                              │
+│  #B4D N5A           [分享]    │  ← hash + 分享按钮
+│                              │
+│      密码不是 ▲3■5●2          │  显示用户提交的密码
+│                              │
+│      [继续]    [查看答案]      │
+└──────────────────────────────┘
+       │               │
+       │               └─ 点击 → 下方 reveal 正确密码
+       │                         按钮变为 [回到主页]
+       ▼
+┌──────────────────────────────┐
+│      ❌ 答案错误               │
+│                              │
+│  #B4D N5A           [分享]    │  ← hash + 分享按钮
+│                              │
+│      密码不是 ▲3■5●2          │
+│                              │
+│      正确密码: ▲1■4●3         │  ← 新增显示 secretCode
+│                              │
+│           [回到主页]          │  → set phase="failed", navigate("/")
+└──────────────────────────────┘
+```
+
+### 状态管理
+
+```typescript
+type SubmitView = "none" | "input" | "correct" | "incorrect" | "answer-revealed";
+```
+
+| 视图 | 进入条件 | 按钮 | 行为 |
+|------|----------|------|------|
+| `input` | 点击"提交答案" | [取消] [提交] | 取消→关闭 / 提交→调submitFinalAnswer（不修改phase） |
+| `correct` | submitFinalAnswer 返回 true | [回到主页] | set phase="solved", navigate("/") |
+| `incorrect` | submitFinalAnswer 返回 false | [继续] [查看答案] | 继续→关闭 / 查看答案→reveal |
+| `answer-revealed` | 点击[查看答案] | [回到主页] | set phase="failed", navigate("/") |
+
+注：`submitFinalAnswer` 仅做密码比对返回 boolean，不再修改 phase。phase 由各视图的"回到主页"按钮自行设置。
+
+### 比较逻辑（正确视图）
+
+```
+玩家轮次 = new Set(records.map(r => r.round)).size
+玩家问题 = records.length
+TM轮次   = Math.ceil(par / 3)
+TM问题   = par
+
+玩家轮次 <= TM轮次 && 玩家问题 <= TM问题
+  → 绿色卡片 "恭喜你战胜了图灵机！"
+否则
+  → 红色卡片 "很抱歉你没有战胜图灵机"
+```
+
+### 数据结构变更
+
+```diff
+// src/core/types.ts
+interface Problem {
+  ...
++ par: number;
+}
+
+// src/core/machine.ts: resolveProblem 透传 api.par
+// src/store/gameStore.ts: 新增 par 状态 + partialize + merge 重建
+```
+
+### 实施文件清单
+
+| 文件 | 改动 |
+|------|------|
+| `src/core/types.ts` | `Problem` 接口增加 `par` |
+| `src/core/machine.ts` | `resolveProblem` 透传 `par` |
+| `src/store/gameStore.ts` | 新增 `par` 字段、持久化、重建 |
+| `src/components/CodeInput.tsx` | 新增 `hideTitle` prop |
+| `src/components/GameControls.tsx` | "确认密码"→"验证密码"；"提交答案"按钮改为紫圆色 `#7f66ad` |
+| `src/pages/Game.tsx` | 重写 submit 相关部分：全屏覆层 + 三视图切换 |

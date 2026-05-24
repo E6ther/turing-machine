@@ -8,6 +8,7 @@ interface CodeInputProps {
   locked: boolean;
   submitMode?: boolean;
   onSubmitCode?: () => void;
+  hideTitle?: boolean;
 }
 
 export function CodeInput({
@@ -16,12 +17,15 @@ export function CodeInput({
   locked,
   submitMode,
   onSubmitCode,
+  hideTitle,
 }: CodeInputProps) {
   return (
     <div className="flex flex-col items-center gap-3">
-      <h2 className="text-lg font-bold">
-        {submitMode ? "提交最终答案" : locked ? "本轮密码" : "选择密码"}
-      </h2>
+      {!hideTitle && (
+        <h2 className="text-lg font-bold">
+          {submitMode ? "提交最终答案" : locked ? "本轮密码" : "选择密码"}
+        </h2>
+      )}
       <div className="flex flex-col gap-3">
         {value.map((digit, i) => (
           <div key={i} className="flex items-center gap-3">

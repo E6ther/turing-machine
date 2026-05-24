@@ -9,6 +9,7 @@ export function resolveProblem(api: ApiResponse): Problem {
     mode: Number(api.m),
     fake: api.fake,
     hash: api.hash,
+    par: api.par,
   };
 }
 
