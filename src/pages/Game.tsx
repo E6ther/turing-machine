@@ -35,6 +35,7 @@ export function Game() {
   const nextRound = useGameStore((s) => s.nextRound);
   const hash = useGameStore((s) => s.hash);
   const par = useGameStore((s) => s.par);
+  const clearState = useGameStore((s) => s.clearState);
 
   const [submitView, setSubmitView] = useState<"none" | "input" | "correct" | "incorrect" | "answer-revealed">("none");
   const [submitCode, setSubmitCode] = useState<Code>([1, 1, 1]);
@@ -72,7 +73,10 @@ export function Game() {
   const gameContent = (
     <>
       <button
-        onClick={() => navigate("/")}
+        onClick={() => {
+          clearState();
+          navigate("/");
+        }}
         className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
       >
         &larr; 返回首页
