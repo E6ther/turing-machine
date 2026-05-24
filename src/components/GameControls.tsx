@@ -2,9 +2,11 @@ interface GameControlsProps {
   phase: "idle" | "playing" | "solved" | "failed";
   gamePhase: "code-input" | "verifier-select";
   canTest: boolean;
+  canGoBack?: boolean;
   onConfirmCode: () => void;
   onTest: () => void;
   onNextRound: () => void;
+  onBackToCodeInput?: () => void;
   onSubmitAnswer: () => void;
   onNewGame: () => void;
 }
@@ -13,9 +15,11 @@ export function GameControls({
   phase,
   gamePhase,
   canTest,
+  canGoBack,
   onConfirmCode,
   onTest,
   onNextRound,
+  onBackToCodeInput,
   onSubmitAnswer,
   onNewGame,
 }: GameControlsProps) {
@@ -71,10 +75,10 @@ export function GameControls({
   return (
     <div className="flex gap-3 justify-center">
       <button
-        onClick={onNextRound}
+        onClick={canGoBack ? onBackToCodeInput : onNextRound}
         className="px-6 py-3 bg-[#56b3dc] text-white rounded-lg font-bold hover:bg-[#4a9ec4] transition-colors"
       >
-        下一轮
+        {canGoBack ? "返回" : "下一轮"}
       </button>
       <button
         onClick={onTest}

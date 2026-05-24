@@ -166,33 +166,35 @@ export function Game() {
       )}
 
       {phase === "playing" && (
-        <GameControls
-          phase={phase}
-          gamePhase={gamePhase}
-          canTest={canTest}
-          onConfirmCode={confirmCode}
-          onTest={() => testVerifier()}
-          onNextRound={nextRound}
-          onSubmitAnswer={() => {
-            setSubmitCode([1, 1, 1]);
-            setShowSubmitModal(true);
-          }}
-          onNewGame={() => navigate("/")}
-        />
-      )}
+          <GameControls
+            phase={phase}
+            gamePhase={gamePhase}
+            canTest={canTest}
+            canGoBack={gamePhase === "verifier-select" && roundVerifyCount === 0}
+            onConfirmCode={confirmCode}
+            onTest={() => testVerifier()}
+            onNextRound={nextRound}
+            onBackToCodeInput={backToCodeInput}
+            onSubmitAnswer={() => {
+              setSubmitCode([1, 1, 1]);
+              setShowSubmitModal(true);
+            }}
+            onNewGame={() => navigate("/")}
+          />
+        )}
 
-      {(phase === "solved" || phase === "failed") && (
-        <GameControls
-          phase={phase}
-          gamePhase={gamePhase}
-          canTest={false}
-          onConfirmCode={confirmCode}
-          onTest={() => {}}
-          onNextRound={nextRound}
-          onSubmitAnswer={() => {}}
-          onNewGame={() => navigate("/")}
-        />
-      )}
+        {(phase === "solved" || phase === "failed") && (
+          <GameControls
+            phase={phase}
+            gamePhase={gamePhase}
+            canTest={false}
+            onConfirmCode={confirmCode}
+            onTest={() => {}}
+            onNextRound={nextRound}
+            onSubmitAnswer={() => {}}
+            onNewGame={() => navigate("/")}
+          />
+        )}
 
       {showSubmitModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -254,11 +256,9 @@ export function Game() {
         </>
       ) : (
         <div className="flex items-start justify-center gap-4">
-          {records.length > 0 && (
-            <div className="sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto shrink-0">
-              <TestHistory records={records} totalCards={verifiers.length} />
-            </div>
-          )}
+          <div className="sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-y-auto shrink-0">
+            <TestHistory records={records} totalCards={verifiers.length} />
+          </div>
           <div className="flex-1 max-w-lg space-y-4">
             {gameContent}
           </div>
