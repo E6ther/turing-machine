@@ -104,7 +104,7 @@ export function Game() {
         <VerifierPanel displayOrder={displayOrder} />
       )}
       {phase === "playing" && gamePhase === "code-input" && (
-        <div className="border rounded-xl bg-white p-3 min-h-[17rem] flex flex-col sticky bottom-4 z-10 shadow-lg">
+        <div className="border rounded-xl bg-white/60 backdrop-blur-sm p-3 min-h-[17rem] flex flex-col sticky bottom-4 z-10 shadow-lg">
           <CodeInput
             value={proposal}
             onChange={setProposal}
@@ -129,23 +129,21 @@ export function Game() {
       )}
 
       {phase === "playing" && gamePhase === "verifier-select" && confirmedCode && (
-        <div className="border rounded-xl bg-white p-3 min-h-[17rem] flex flex-col sticky bottom-4 z-10 shadow-lg">
-          <div className="flex-1 space-y-3">
-            <div className="border rounded-lg bg-gray-50 p-3">
-              <div className="text-center">
-                <div className="text-sm font-bold text-gray-500 mb-1.5">本轮密码</div>
-                <div className="flex items-center justify-center gap-4">
-                  {confirmedCode.map((d, i) => (
-                    <span key={i} className="flex flex-col items-center gap-0.5">
-                      <ColorShape index={i} size={22} />
-                      <span className="text-2xl font-bold text-gray-800 leading-none">{d}</span>
-                    </span>
-                  ))}
-                </div>
+        <div className="border rounded-xl bg-white/60 backdrop-blur-sm p-3 min-h-[17rem] flex flex-col sticky bottom-4 z-10 shadow-lg">
+          <div className="flex-1 flex flex-col gap-3">
+            <div className="text-center">
+              <div className="text-lg font-bold mb-3">本轮密码</div>
+              <div className="flex items-center justify-center gap-4">
+                {confirmedCode.map((d, i) => (
+                  <span key={i} className="flex flex-col items-center gap-0.5">
+                    <ColorShape index={i} size={22} />
+                    <span className="text-2xl font-bold text-gray-800 leading-none">{d}</span>
+                  </span>
+                ))}
               </div>
             </div>
 
-            <div className="text-center">
+            <div className="text-center pb-4">
               <div className="text-sm text-gray-500 mb-2">
                 选择要测试的验证器
                 <span className="ml-2 text-gray-400">
@@ -421,13 +419,13 @@ export function Game() {
           </div>
           <button
             onClick={() => setShowHistoryOverlay(true)}
-            className={"fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-[#56b3dc] rounded-r-xl shadow-md w-6 py-3 flex flex-col items-center justify-center text-sm font-bold text-white transition-opacity cursor-pointer " + (showHistoryOverlay || showMarkersOverlay ? "opacity-0 pointer-events-none" : "")}
+            className={"fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-[#56b3dc]/50 backdrop-blur-sm rounded-r-xl shadow-md w-6 py-3 flex flex-col items-center justify-center text-sm font-bold text-white transition-opacity cursor-pointer " + (showHistoryOverlay || showMarkersOverlay ? "opacity-0 pointer-events-none" : "")}
           >
             <span className="flex flex-col items-center gap-1">{"历史记录".split("").map((c, i) => <span key={i}>{c}</span>)}</span>
           </button>
           <button
             onClick={() => setShowMarkersOverlay(true)}
-            className={"fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-[#febc11] rounded-l-xl shadow-md w-6 py-3 flex flex-col items-center justify-center text-sm font-bold text-white transition-opacity cursor-pointer " + (showHistoryOverlay || showMarkersOverlay ? "opacity-0 pointer-events-none" : "")}
+            className={"fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-[#febc11]/50 backdrop-blur-sm rounded-l-xl shadow-md w-6 py-3 flex flex-col items-center justify-center text-sm font-bold text-white transition-opacity cursor-pointer " + (showHistoryOverlay || showMarkersOverlay ? "opacity-0 pointer-events-none" : "")}
           >
             <span className="flex flex-col items-center gap-1">{"标记".split("").map((c, i) => <span key={i}>{c}</span>)}</span>
           </button>
@@ -439,7 +437,7 @@ export function Game() {
               >
                 ✕
               </button>
-              <div className="bg-white rounded-xl p-4 max-h-[80vh] overflow-y-auto" style={{ width: "fit-content", minWidth: "300px" }}>
+              <div className="bg-white/75 backdrop-blur-sm rounded-xl p-4 max-h-[80vh] overflow-y-auto" style={{ width: "fit-content", minWidth: "300px" }}>
                 <div className="text-sm font-bold text-slate-500 mb-2 text-center">历史记录</div>
                 <TestHistory records={records} totalCards={verifiers.length} />
               </div>
@@ -463,7 +461,7 @@ export function Game() {
             {gameContent}
           </div>
           <div className="fixed top-1/2 -translate-y-1/2" style={{ right: 'calc(50% + 16rem + 1rem)' }}>
-            <div className="max-h-[calc(100vh-2rem)] overflow-y-auto">
+            <div className="max-h-[calc(100vh-2rem)] overflow-y-auto bg-white/50 backdrop-blur-sm rounded-xl p-3">
               <div className="text-sm font-bold text-slate-500 mb-1 text-center">历史记录</div>
               <TestHistory records={records} totalCards={verifiers.length} />
             </div>

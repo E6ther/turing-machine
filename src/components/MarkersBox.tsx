@@ -8,7 +8,7 @@ export function MarkersBox() {
   const cycleMarker = useGameStore((s) => s.cycleMarker);
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-4">
+    <div className="bg-white/50 backdrop-blur-sm rounded-xl shadow-md p-4">
       <div className="text-sm font-bold text-slate-500 mb-2 text-center">标记</div>
       <div className="grid grid-cols-3 gap-x-3 gap-y-1">
         <div className="flex justify-center"><ColorShape index={0} size={24} /></div>
