@@ -437,7 +437,7 @@ export function Game() {
               >
                 ✕
               </button>
-              <div className="bg-white/75 backdrop-blur-sm rounded-xl p-4 max-h-[80vh] overflow-y-auto" style={{ width: "fit-content", minWidth: "300px" }}>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 max-h-[80vh] overflow-y-auto" style={{ width: "fit-content", minWidth: "300px" }}>
                 <div className="text-sm font-bold text-slate-500 mb-2 text-center">历史记录</div>
                 <TestHistory records={records} totalCards={verifiers.length} />
               </div>

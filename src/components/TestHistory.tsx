@@ -27,11 +27,11 @@ export function TestHistory({ records, totalCards }: TestHistoryProps) {
             <div className="w-7 flex-shrink-0 flex items-center justify-center"><ColorShape index={0} size={16} /></div>
             <div className="w-7 flex-shrink-0 flex items-center justify-center"><ColorShape index={1} size={16} /></div>
             <div className="w-7 flex-shrink-0 flex items-center justify-center"><ColorShape index={2} size={16} /></div>
-            <div className="w-4 flex-shrink-0 text-center text-gray-300">|</div>
+            <div className="w-4 flex-shrink-0 text-center text-green-500">|</div>
             {Array.from({ length: numCards }, (_, i) => (
               <div key={i} className="w-7 flex-shrink-0 text-center text-green-500 font-bold">{LETTERS[i]}</div>
             ))}
-            <div className="absolute bottom-0 left-0 h-0 border-b-2 border-dashed border-gray-300 pointer-events-none"
+            <div className="absolute bottom-0 left-0 h-0 border-b-2 border-dashed border-green-500 pointer-events-none"
               style={{ width: dashWidth }} />
           </div>
           {(() => {
@@ -48,13 +48,13 @@ export function TestHistory({ records, totalCards }: TestHistoryProps) {
                   {code.map((d, i) => (
                     <div key={i} className="w-7 flex-shrink-0 text-center"><span className={`inline-block w-5 text-white font-bold rounded ${bgColors[i]}`}>{d}</span></div>
                   ))}
-                  <div className="w-4 flex-shrink-0 text-center text-gray-300">|</div>
+                  <div className="w-4 flex-shrink-0 text-center text-green-500">|</div>
                   {results.map((r, i) => (
                     <div key={i} className="w-7 flex-shrink-0 text-center">
-                      <span className={`inline-flex items-center justify-center w-5 h-5 border border-gray-300 rounded align-middle font-bold ${r === null ? "" : r === "✓" ? "text-green-600" : "text-red-500"}`}>{r ?? ""}</span>
+                      <span className={`inline-flex items-center justify-center w-5 h-5 border border-green-500 rounded align-middle font-bold ${r === null ? "" : r === "✓" ? "text-green-600" : "text-red-500"}`}>{r ?? ""}</span>
                     </div>
                   ))}
-                  <div className="absolute bottom-0 left-0 h-0 border-b-2 border-dashed border-gray-300 pointer-events-none"
+                  <div className="absolute bottom-0 left-0 h-0 border-b-2 border-dashed border-green-500 pointer-events-none"
                     style={{ width: dashWidth }} />
                 </div>
               );
@@ -67,13 +67,13 @@ export function TestHistory({ records, totalCards }: TestHistoryProps) {
                   {[0, 1, 2].map((j) => (
                     <div key={j} className="w-7 flex-shrink-0 text-center"><span className={`inline-block w-5 rounded opacity-30 ${bgColors[j]}`}>&nbsp;</span></div>
                   ))}
-                  <div className="w-4 flex-shrink-0 text-center text-gray-200">|</div>
+                  <div className="w-4 flex-shrink-0 text-center text-green-500">|</div>
                   {Array.from({ length: numCards }, (_, j) => (
                     <div key={j} className="w-7 flex-shrink-0 text-center">
-                      <span className="inline-flex items-center justify-center w-5 h-5 border border-gray-200 rounded align-middle">&nbsp;</span>
+                      <span className="inline-flex items-center justify-center w-5 h-5 border border-green-500 rounded align-middle">&nbsp;</span>
                     </div>
                   ))}
-                  <div className="absolute bottom-0 left-0 h-0 border-b-2 border-dashed border-gray-200 pointer-events-none"
+                  <div className="absolute bottom-0 left-0 h-0 border-b-2 border-dashed border-green-500 pointer-events-none"
                     style={{ width: dashWidth }} />
                 </div>
               );

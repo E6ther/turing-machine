@@ -44,7 +44,7 @@ export function Home() {
         开始新游戏
       </button>
       <a
-        href="/rules_CNS.pdf"
+        href={`${import.meta.env.BASE_URL}rules_CNS.pdf`}
         target="_blank"
         className="text-sm text-slate-400 hover:text-slate-600 underline transition-colors"
       >
